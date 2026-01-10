@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.drawsystemserver.mapper.TeamMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.drawsystemserver.entity.Team">
+        <id column="id" property="id"/>
+        <result column="sessionId" property="sessionId"/>
+        <result column="captainId" property="captainId"/>
+        <result column="teamName" property="teamName"/>
+        <result column="captainName" property="captainName"/>
+        <result column="playerCount" property="playerCount"/>
+        <result column="createTime" property="createTime"/>
+        <result column="updateTime" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM team WHERE id = #{id}
+    </select>
+
+    <select id="selectByCaptainId" resultMap="BaseResultMap">
+        SELECT * FROM team WHERE captainId = #{captainId} LIMIT 1
+    </select>
+
+    <select id="selectBySessionId" resultMap="BaseResultMap">
+        SELECT * FROM team WHERE sessionId = #{sessionId} ORDER BY id
+    </select>
+
+    <select id="selectBySessionIdAndCaptainId" resultMap="BaseResultMap">
+        SELECT * FROM team WHERE sessionId = #{sessionId} AND captainId = #{captainId} LIMIT 1
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM team ORDER BY id
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO team (sessionId, captainId, teamName, captainName, playerCount)
+        VALUES (#{sessionId}, #{captainId}, #{teamName}, #{captainName}, #{playerCount})
+    </insert>
+
+    <update id="update">
+        UPDATE team
+        <set>
+            <if test="teamName != null">teamName = #{teamName},</if>
+            <if test="captainName != null">captainName = #{captainName},</if>
+            <if test="playerCount != null">playerCount = #{playerCount},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="incrementPlayerCount">
+        UPDATE team SET playerCount = playerCount + 1 WHERE id = #{id}
+    </update>
+
+    <update id="decrementPlayerCount">
+        UPDATE team SET playerCount = playerCount - 1 WHERE id = #{id} AND playerCount > 0
+    </update>
+
+</mapper>

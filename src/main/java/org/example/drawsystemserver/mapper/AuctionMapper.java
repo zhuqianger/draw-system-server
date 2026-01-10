@@ -1,0 +1,22 @@
+package org.example.drawsystemserver.mapper;
+
+import org.apache.ibatis.annotations.Mapper;
+import org.example.drawsystemserver.entity.Auction;
+
+import java.util.List;
+
+@Mapper
+public interface AuctionMapper {
+    Auction selectById(Long id);
+    Auction selectActiveByPlayerId(Long playerId);
+    Auction selectCurrentActive();
+    Auction selectCurrentActiveBySessionId(Long sessionId);
+    List<Auction> selectByStatus(String status);
+    List<Auction> selectBySessionId(Long sessionId);
+    List<Auction> selectAll();
+    int insert(Auction auction);
+    int update(Auction auction);
+    int updateStatus(Long id, String status);
+    int updateWinning(Long id, Long winningBidId, Long winningTeamId);
+    List<Auction> selectExpiredActive();
+}

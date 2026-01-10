@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.drawsystemserver.mapper.AuctionSessionMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.drawsystemserver.entity.AuctionSession">
+        <id column="id" property="id"/>
+        <result column="sessionName" property="sessionName"/>
+        <result column="dataSourceFile" property="dataSourceFile"/>
+        <result column="captainIds" property="captainIds"/>
+        <result column="status" property="status"/>
+        <result column="createTime" property="createTime"/>
+        <result column="updateTime" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM auction_session WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM auction_session ORDER BY createTime DESC
+    </select>
+
+    <select id="selectByStatus" resultMap="BaseResultMap">
+        SELECT * FROM auction_session WHERE status = #{status} ORDER BY createTime DESC
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO auction_session (sessionName, dataSourceFile, captainIds, status)
+        VALUES (#{sessionName}, #{dataSourceFile}, #{captainIds}, #{status})
+    </insert>
+
+    <update id="update">
+        UPDATE auction_session
+        <set>
+            <if test="sessionName != null">sessionName = #{sessionName},</if>
+            <if test="dataSourceFile != null">dataSourceFile = #{dataSourceFile},</if>
+            <if test="captainIds != null">captainIds = #{captainIds},</if>
+            <if test="status != null">status = #{status},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateStatus">
+        UPDATE auction_session SET status = #{status} WHERE id = #{id}
+    </update>
+
+</mapper>

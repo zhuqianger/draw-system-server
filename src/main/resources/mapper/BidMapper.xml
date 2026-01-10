@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.drawsystemserver.mapper.BidMapper">
+
+    <resultMap id="BaseResultMap" type="org.example.drawsystemserver.entity.Bid">
+        <id column="id" property="id"/>
+        <result column="auctionId" property="auctionId"/>
+        <result column="teamId" property="teamId"/>
+        <result column="captainId" property="captainId"/>
+        <result column="amount" property="amount"/>
+        <result column="bidTime" property="bidTime"/>
+        <result column="isWinner" property="isWinner"/>
+    </resultMap>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM bid WHERE id = #{id}
+    </select>
+
+    <select id="selectByAuctionId" resultMap="BaseResultMap">
+        SELECT * FROM bid WHERE auctionId = #{auctionId} ORDER BY amount DESC, bidTime ASC
+    </select>
+
+    <select id="selectByTeamId" resultMap="BaseResultMap">
+        SELECT * FROM bid WHERE teamId = #{teamId} ORDER BY bidTime DESC
+    </select>
+
+    <select id="selectHighestByAuctionId" resultMap="BaseResultMap">
+        SELECT * FROM bid WHERE auctionId = #{auctionId} ORDER BY amount DESC, bidTime ASC LIMIT 1
+    </select>
+
+    <select id="selectRecentByAuctionId" resultMap="BaseResultMap">
+        SELECT * FROM bid WHERE auctionId = #{auctionId} ORDER BY bidTime DESC LIMIT #{limit}
+    </select>
+
+    <select id="selectMaxAmountByAuctionId" resultType="java.math.BigDecimal">
+        SELECT MAX(amount) FROM bid WHERE auctionId = #{auctionId}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bid (auctionId, teamId, captainId, amount, bidTime, isWinner)
+        VALUES (#{auctionId}, #{teamId}, #{captainId}, #{amount}, #{bidTime}, #{isWinner})
+    </insert>
+
+    <update id="update">
+        UPDATE bid
+        <set>
+            <if test="auctionId != null">auctionId = #{auctionId},</if>
+            <if test="teamId != null">teamId = #{teamId},</if>
+            <if test="captainId != null">captainId = #{captainId},</if>
+            <if test="amount != null">amount = #{amount},</if>
+            <if test="bidTime != null">bidTime = #{bidTime},</if>
+            <if test="isWinner != null">isWinner = #{isWinner},</if>
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateIsWinner">
+        UPDATE bid SET isWinner = #{isWinner} WHERE auctionId = #{auctionId} AND id = #{bidId}
+    </update>
+
+</mapper>

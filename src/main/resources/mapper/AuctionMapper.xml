@@ -40,10 +40,6 @@
         SELECT * FROM auction ORDER BY startTime DESC
     </select>
 
-    <select id="selectExpiredActive" resultMap="BaseResultMap">
-        SELECT * FROM auction WHERE status = 'ACTIVE' AND endTime &lt; NOW()
-    </select>
-
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO auction (sessionId, playerId, startTime, endTime, duration, status)
         VALUES (#{sessionId}, #{playerId}, #{startTime}, #{endTime}, #{duration}, #{status})

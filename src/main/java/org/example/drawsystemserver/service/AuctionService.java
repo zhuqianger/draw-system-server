@@ -13,7 +13,6 @@ public interface AuctionService {
     Bid placeBid(Long auctionId, Long teamId, Long captainId, java.math.BigDecimal amount);
     Auction finishAuction(Long auctionId);
     List<Auction> getActiveAuctions();
-    void checkAndFinishExpiredAuctions();
     Bid getHighestBid(Long auctionId);
     List<Bid> getRecentBids(Long auctionId, int limit);
 }

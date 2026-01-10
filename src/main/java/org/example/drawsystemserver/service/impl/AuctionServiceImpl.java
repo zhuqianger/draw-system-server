@@ -168,21 +168,6 @@ public class AuctionServiceImpl implements AuctionService {
     }
 
     @Override
-    @Transactional
-    public void checkAndFinishExpiredAuctions() {
-        List<Auction> expiredAuctions = auctionMapper.selectExpiredActive();
-        for (Auction auction : expiredAuctions) {
-            try {
-                finishAuction(auction.getId());
-                // 注意：这里不能直接注入WebSocketService，会导致循环依赖
-                // WebSocket推送应该在Controller层或者通过事件机制处理
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    @Override
     public Bid getHighestBid(Long auctionId) {
         return bidMapper.selectHighestByAuctionId(auctionId);
     }

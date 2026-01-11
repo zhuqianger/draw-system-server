@@ -62,13 +62,21 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
             
             // 从保存的文件路径解析队长信息并创建队伍
             Map<Integer, String> captains = excelService.parseCaptainsFromFilePath(filePath, captainIndices);
-            for (Integer captainIndex : captainIndices) {
+            // 遍历队长序号列表，顺序对应userId（第1个序号→userId=1，第2个序号→userId=2，以此类推）
+            for (int i = 0; i < captainIndices.size(); i++) {
+                Integer captainIndex = captainIndices.get(i);
+                Long captainUserId = (long) (i + 1); // 队长序号在列表中的位置（从1开始）对应userId
                 String captainName = captains.getOrDefault(captainIndex, "队长" + captainIndex);
-                // 这里假设队长序号对应userId，实际可能需要根据业务调整
-                // 创建队伍时，captainId可能需要在后续步骤中关联实际用户
+                
+                // 验证该userId是否存在且为队长类型
+                User captainUser = userMapper.selectById(captainUserId);
+                if (captainUser == null || !"CAPTAIN".equals(captainUser.getUserType())) {
+                    throw new RuntimeException("队长用户ID " + captainUserId + " 不存在或不是队长类型");
+                }
+                
                 Team team = new Team();
                 team.setSessionId(session.getId());
-                team.setCaptainId(null); // 暂时为空，后续关联
+                team.setCaptainId(captainUserId); // 设置对应的userId
                 team.setCaptainName(captainName);
                 team.setTeamName(captainName + "的队伍");
                 team.setPlayerCount(0);

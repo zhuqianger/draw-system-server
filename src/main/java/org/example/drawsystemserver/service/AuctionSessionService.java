@@ -10,5 +10,6 @@ public interface AuctionSessionService {
     List<AuctionSession> getAllSessions();
     AuctionSession getSessionById(Long sessionId);
     AuctionSession activateSession(Long sessionId);
+    AuctionSession deleteSession(Long sessionId);
     boolean canUserAccessSession(Long sessionId, Long userId, String userType);
 }

@@ -97,4 +97,25 @@ public class AuctionSessionController {
             return ResponseDTO.error("激活失败：" + e.getMessage());
         }
     }
+
+    /**
+     * 删除拍卖流程（仅管理员，实际是将status设置为DELETED）
+     */
+    @DeleteMapping("/{sessionId}")
+    public ResponseDTO<Void> deleteSession(@PathVariable Long sessionId, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以删除拍卖流程");
+        }
+
+        try {
+            AuctionSession session = sessionService.deleteSession(sessionId);
+            if (session == null) {
+                return ResponseDTO.error("拍卖流程不存在");
+            }
+            return ResponseDTO.success("拍卖流程已删除", null);
+        } catch (Exception e) {
+            return ResponseDTO.error("删除失败：" + e.getMessage());
+        }
+    }
 }

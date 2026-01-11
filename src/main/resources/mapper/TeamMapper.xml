@@ -6,6 +6,7 @@
         <id column="id" property="id"/>
         <result column="sessionId" property="sessionId"/>
         <result column="captainId" property="captainId"/>
+        <result column="userId" property="userId"/>
         <result column="teamName" property="teamName"/>
         <result column="captainName" property="captainName"/>
         <result column="playerCount" property="playerCount"/>
@@ -34,8 +35,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO team (sessionId, captainId, teamName, captainName, playerCount)
-        VALUES (#{sessionId}, #{captainId}, #{teamName}, #{captainName}, #{playerCount})
+        INSERT INTO team (sessionId, captainId, userId, teamName, captainName, playerCount)
+        VALUES (#{sessionId}, #{captainId}, #{userId}, #{teamName}, #{captainName}, #{playerCount})
     </insert>
 
     <update id="update">
@@ -43,6 +44,7 @@
         <set>
             <if test="sessionId != null">sessionId = #{sessionId},</if>
             <if test="captainId != null">captainId = #{captainId},</if>
+            <if test="userId != null">userId = #{userId},</if>
             <if test="teamName != null">teamName = #{teamName},</if>
             <if test="captainName != null">captainName = #{captainName},</if>
             <if test="playerCount != null">playerCount = #{playerCount},</if>

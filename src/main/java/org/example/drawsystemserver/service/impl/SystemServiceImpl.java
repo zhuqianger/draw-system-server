@@ -132,9 +132,13 @@ public class SystemServiceImpl implements SystemService {
         dto.setTeamName(team.getTeamName());
         dto.setPlayerCount(team.getPlayerCount());
 
-        User captain = userMapper.selectById(team.getCaptainId());
-        if (captain != null) {
-            dto.setCaptainName(captain.getUsername());
+        // captainName从player表的groupName获取（captainId是player表的id）
+        Player captainPlayer = playerMapper.selectById(team.getCaptainId());
+        if (captainPlayer != null) {
+            dto.setCaptainName(captainPlayer.getGroupName());
+        } else {
+            // 如果找不到player，使用team中存储的captainName作为备选
+            dto.setCaptainName(team.getCaptainName());
         }
 
         List<Player> players = playerMapper.selectByTeamId(team.getId());

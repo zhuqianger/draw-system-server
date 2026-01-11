@@ -60,13 +60,13 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                 playerMapper.insert(player);
             }
             
-            // 从保存的文件路径解析队长信息并创建队伍
-            Map<Integer, String> captains = excelService.parseCaptainsFromFilePath(filePath, captainIndices);
+            // 获取该session下所有已插入的player（用于查找队长player）
+            List<Player> allPlayers = playerMapper.selectBySessionId(session.getId());
+            
             // 遍历队长序号列表，顺序对应userId（第1个序号→userId=1，第2个序号→userId=2，以此类推）
             for (int i = 0; i < captainIndices.size(); i++) {
-                Integer captainIndex = captainIndices.get(i);
-                Long captainUserId = (long) (i + 1); // 队长序号在列表中的位置（从1开始）对应userId
-                String captainName = captains.getOrDefault(captainIndex, "队长" + captainIndex);
+                Integer captainGroupId = captainIndices.get(i); // 队长序号（groupId）
+                Long captainUserId = (long) (i + 1); // 对应的userId（根据输入的序号在列表中的位置）
                 
                 // 验证该userId是否存在且为队长类型
                 User captainUser = userMapper.selectById(captainUserId);
@@ -74,13 +74,28 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                     throw new RuntimeException("队长用户ID " + captainUserId + " 不存在或不是队长类型");
                 }
                 
+                // 从已插入的player中查找groupId匹配的队长player
+                Player captainPlayer = allPlayers.stream()
+                    .filter(p -> captainGroupId.equals(p.getGroupId()))
+                    .findFirst()
+                    .orElse(null);
+                
+                if (captainPlayer == null) {
+                    throw new RuntimeException("未找到groupId为 " + captainGroupId + " 的player");
+                }
+                
                 Team team = new Team();
                 team.setSessionId(session.getId());
-                team.setCaptainId(captainUserId); // 设置对应的userId
-                team.setCaptainName(captainName);
-                team.setTeamName(captainName + "的队伍");
+                team.setCaptainId(captainPlayer.getId()); // captainId设置为player表中的id
+                team.setUserId(captainUserId); // userId设置为对应的userId（根据输入的序号位置）
+                team.setCaptainName(captainPlayer.getGroupName()); // captainName从player表的groupName获取
+                team.setTeamName((i + 1) + "号队伍"); // teamName按照下标设置为"1号队伍"、"2号队伍"等
                 team.setPlayerCount(0);
                 teamMapper.insert(team);
+                
+                // 更新队长player的teamId
+                captainPlayer.setTeamId(team.getId());
+                playerMapper.update(captainPlayer);
             }
             
             return session;
@@ -93,7 +108,11 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
 
     @Override
     public List<AuctionSession> getAllSessions() {
-        return sessionMapper.selectAll();
+        // 获取所有session，过滤掉DELETED状态的
+        List<AuctionSession> allSessions = sessionMapper.selectAll();
+        return allSessions.stream()
+            .filter(session -> session.getStatus() == null || !"DELETED".equals(session.getStatus()))
+            .collect(java.util.stream.Collectors.toList());
     }
 
     @Override
@@ -107,6 +126,17 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
         AuctionSession session = sessionMapper.selectById(sessionId);
         if (session != null) {
             session.setStatus("ACTIVE");
+            sessionMapper.update(session);
+        }
+        return session;
+    }
+
+    @Override
+    @Transactional
+    public AuctionSession deleteSession(Long sessionId) {
+        AuctionSession session = sessionMapper.selectById(sessionId);
+        if (session != null) {
+            session.setStatus("DELETED");
             sessionMapper.update(session);
         }
         return session;

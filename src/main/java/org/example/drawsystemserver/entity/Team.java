@@ -9,7 +9,8 @@ import java.util.List;
 public class Team {
     private Long id;
     private Long sessionId; // 所属拍卖流程ID
-    private Long captainId;
+    private Long captainId; // 队长player的ID（来自player表）
+    private Long userId; // 队长用户的ID（来自user表）
     private String teamName;
     private String captainName; // 队长名称（从Excel导入）
     private Integer playerCount; // 队员数量，最多4人
@@ -45,6 +46,14 @@ public class Team {
 
     public void setCaptainId(Long captainId) {
         this.captainId = captainId;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public String getTeamName() {

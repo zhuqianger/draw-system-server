@@ -28,7 +28,7 @@ public class ExcelServiceImpl implements ExcelService {
         Workbook workbook = WorkbookFactory.create(file.getInputStream());
         Sheet sheet = workbook.getSheetAt(0); // 读取第一个工作表
         
-        // 跳过表头，从第二行开始读取
+        // 跳过表头，从第二行开始读取（第一行是字段描述）
         for (int i = 1; i <= sheet.getLastRowNum(); i++) {
             Row row = sheet.getRow(i);
             if (row == null) continue;
@@ -36,12 +36,14 @@ public class ExcelServiceImpl implements ExcelService {
             Player player = new Player();
             player.setSessionId(sessionId);
             
-            // 读取各列数据（根据实际Excel格式调整）
-            // 假设列顺序：序号、群内名字、游戏ID、位置、英雄、段位、费用
-            int colIndex = 0;
+            // Excel列索引映射（根据实际Excel格式，从0开始）
+            // 0: 序号, 1: 提交时间, 2: 采用时间, 3: 来源, 4: 来源详情,
+            // 5: 来源IP, 6: 游戏ID, 7: 群内名称, 8: 历史最高段位
+            // 9: 当前段位, 10: 报名截图, 11: 常用位置, 12: 是否报名队长
+            // 13: 报名队长理由, 14: 自我介绍
             
-            // 序号
-            Cell idCell = row.getCell(colIndex++);
+            // colIndex 0: 序号 → groupId
+            Cell idCell = row.getCell(0);
             if (idCell != null) {
                 if (idCell.getCellType() == CellType.NUMERIC) {
                     player.setGroupId((int) idCell.getNumericCellValue());
@@ -56,54 +58,49 @@ public class ExcelServiceImpl implements ExcelService {
                 continue; // 序号为空则跳过
             }
             
-            // 群内名字
-            Cell groupNameCell = row.getCell(colIndex++);
-            if (groupNameCell != null) {
-                player.setGroupName(getCellValueAsString(groupNameCell));
-            }
-            
-            // 游戏ID
-            Cell gameIdCell = row.getCell(colIndex++);
+            // colIndex 6: 游戏ID → gameId
+            Cell gameIdCell = row.getCell(6);
             if (gameIdCell != null) {
                 player.setGameId(getCellValueAsString(gameIdCell));
             }
             
-            // 擅长位置
-            Cell positionCell = row.getCell(colIndex++);
-            if (positionCell != null) {
-                player.setPosition(getCellValueAsString(positionCell));
+            // colIndex 7: 群内名称 → groupName
+            Cell groupNameCell = row.getCell(7);
+            if (groupNameCell != null) {
+                player.setGroupName(getCellValueAsString(groupNameCell));
             }
             
-            // 擅长英雄
-            Cell heroesCell = row.getCell(colIndex++);
-            if (heroesCell != null) {
-                player.setHeroes(getCellValueAsString(heroesCell));
-            }
+            // colIndex 8: 历史最高段位 - 跳过（只需要当前段位）
             
-            // 段位
-            Cell rankCell = row.getCell(colIndex++);
+            // colIndex 9: 当前段位 → rank
+            Cell rankCell = row.getCell(9);
             if (rankCell != null) {
                 player.setRank(getCellValueAsString(rankCell));
             }
             
-            // 费用
-            Cell costCell = row.getCell(colIndex++);
-            if (costCell != null) {
-                if (costCell.getCellType() == CellType.NUMERIC) {
-                    player.setCost(BigDecimal.valueOf(costCell.getNumericCellValue()));
-                } else if (costCell.getCellType() == CellType.STRING) {
-                    try {
-                        player.setCost(new BigDecimal(costCell.getStringCellValue()));
-                    } catch (NumberFormatException e) {
-                        // 费用为空则设置为0
-                        player.setCost(BigDecimal.ZERO);
-                    }
-                }
-            } else {
-                player.setCost(BigDecimal.ZERO);
+            // colIndex 10: 报名截图 - 跳过
+            
+            // colIndex 11: 常用位置 → position
+            Cell positionCell = row.getCell(11);
+            if (positionCell != null) {
+                String position = getCellValueAsString(positionCell);
+                // Excel中用"|"分隔（如"上单 | 中单"），转换为逗号分隔
+                player.setPosition(position.replace(" | ", ",").replace("|", ","));
             }
             
+            // colIndex 12: 是否报名队长 - 跳过
+            // colIndex 13: 报名队长理由 - 跳过
+            
+            // colIndex 14: 自我杰斯（自我介绍） → heroes
+            Cell heroesCell = row.getCell(14);
+            if (heroesCell != null) {
+                player.setHeroes(getCellValueAsString(heroesCell));
+            }
+            
+            // cost 默认所有人为 3
+            player.setCost(new BigDecimal("3"));
             player.setStatus("POOL");
+            
             players.add(player);
         }
         
@@ -169,27 +166,56 @@ public class ExcelServiceImpl implements ExcelService {
             return "";
         }
         
+        String value;
         switch (cell.getCellType()) {
             case STRING:
-                return cell.getStringCellValue().trim();
+                value = cell.getStringCellValue().trim();
+                break;
             case NUMERIC:
                 if (DateUtil.isCellDateFormatted(cell)) {
-                    return cell.getDateCellValue().toString();
+                    value = cell.getDateCellValue().toString();
                 } else {
                     // 避免科学计数法
                     double numericValue = cell.getNumericCellValue();
                     if (numericValue == (long) numericValue) {
-                        return String.valueOf((long) numericValue);
+                        value = String.valueOf((long) numericValue);
                     } else {
-                        return String.valueOf(numericValue);
+                        value = String.valueOf(numericValue);
                     }
                 }
+                break;
             case BOOLEAN:
-                return String.valueOf(cell.getBooleanCellValue());
+                value = String.valueOf(cell.getBooleanCellValue());
+                break;
             case FORMULA:
-                return cell.getCellFormula();
+                value = cell.getCellFormula();
+                break;
             default:
                 return "";
         }
+        
+        // 清理特殊字符（Unicode不可见字符）
+        return cleanSpecialCharacters(value);
+    }
+    
+    /**
+     * 清理字符串中的特殊字符（Unicode不可见字符等）
+     */
+    private String cleanSpecialCharacters(String str) {
+        if (str == null || str.isEmpty()) {
+            return str;
+        }
+        
+        // 移除常见的Unicode不可见字符
+        // \u2066 (LEFT-TO-RIGHT ISOLATE)
+        // \u2067 (RIGHT-TO-LEFT ISOLATE)
+        // \u2068 (FIRST STRONG ISOLATE)
+        // \u2069 (POP DIRECTIONAL ISOLATE)
+        // \u200B (ZERO WIDTH SPACE)
+        // \u200C (ZERO WIDTH NON-JOINER)
+        // \u200D (ZERO WIDTH JOINER)
+        // \uFEFF (ZERO WIDTH NO-BREAK SPACE)
+        return str.replaceAll("[\u2066\u2067\u2068\u2069\u200B\u200C\u200D\uFEFF]", "")
+                  .trim();
     }
 }

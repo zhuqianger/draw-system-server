@@ -36,45 +36,51 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AuctionSession createSession(String sessionName, MultipartFile excelFile, List<Integer> captainIndices, Long adminId) throws Exception {
-        // 保存Excel文件
+        // 先保存Excel文件（避免多次读取MultipartFile的InputStream）
         String filePath = excelService.saveFile(excelFile);
         
-        // 创建拍卖流程
-        AuctionSession session = new AuctionSession();
-        session.setSessionName(sessionName);
-        session.setDataSourceFile(filePath);
-        session.setStatus("CREATED");
-        
-        // 将队长序号列表转为JSON字符串
-        String captainIdsJson = objectMapper.writeValueAsString(captainIndices);
-        session.setCaptainIds(captainIdsJson);
-        
-        sessionMapper.insert(session);
-        
-        // 解析并导入队员数据
-        List<Player> players = excelService.parsePlayersFromExcel(excelFile, session.getId());
-        for (Player player : players) {
-            playerMapper.insert(player);
+        try {
+            // 创建拍卖流程
+            AuctionSession session = new AuctionSession();
+            session.setSessionName(sessionName);
+            session.setDataSourceFile(filePath);
+            session.setStatus("CREATED");
+            
+            // 将队长序号列表转为JSON字符串
+            String captainIdsJson = objectMapper.writeValueAsString(captainIndices);
+            session.setCaptainIds(captainIdsJson);
+            
+            sessionMapper.insert(session);
+            
+            // 从保存的文件路径解析并导入队员数据（避免重复读取MultipartFile）
+            List<Player> players = excelService.parsePlayersFromFilePath(filePath, session.getId());
+            for (Player player : players) {
+                playerMapper.insert(player);
+            }
+            
+            // 从保存的文件路径解析队长信息并创建队伍
+            Map<Integer, String> captains = excelService.parseCaptainsFromFilePath(filePath, captainIndices);
+            for (Integer captainIndex : captainIndices) {
+                String captainName = captains.getOrDefault(captainIndex, "队长" + captainIndex);
+                // 这里假设队长序号对应userId，实际可能需要根据业务调整
+                // 创建队伍时，captainId可能需要在后续步骤中关联实际用户
+                Team team = new Team();
+                team.setSessionId(session.getId());
+                team.setCaptainId(null); // 暂时为空，后续关联
+                team.setCaptainName(captainName);
+                team.setTeamName(captainName + "的队伍");
+                team.setPlayerCount(0);
+                teamMapper.insert(team);
+            }
+            
+            return session;
+        } catch (Exception e) {
+            // 如果发生异常，记录日志
+            e.printStackTrace();
+            throw e; // 重新抛出异常，让事务回滚
         }
-        
-        // 解析队长信息并创建队伍
-        Map<Integer, String> captains = excelService.parseCaptainsFromExcel(excelFile, captainIndices);
-        for (Integer captainIndex : captainIndices) {
-            String captainName = captains.getOrDefault(captainIndex, "队长" + captainIndex);
-            // 这里假设队长序号对应userId，实际可能需要根据业务调整
-            // 创建队伍时，captainId可能需要在后续步骤中关联实际用户
-            Team team = new Team();
-            team.setSessionId(session.getId());
-            team.setCaptainId(null); // 暂时为空，后续关联
-            team.setCaptainName(captainName);
-            team.setTeamName(captainName + "的队伍");
-            team.setPlayerCount(0);
-            teamMapper.insert(team);
-        }
-        
-        return session;
     }
 
     @Override

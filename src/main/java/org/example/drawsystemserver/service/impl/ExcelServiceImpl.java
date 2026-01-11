@@ -109,6 +109,97 @@ public class ExcelServiceImpl implements ExcelService {
     }
 
     @Override
+    public List<Player> parsePlayersFromFilePath(String filePath, Long sessionId) throws Exception {
+        List<Player> players = new ArrayList<>();
+        
+        // 从文件路径读取Excel文件
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(filePath)) {
+            Workbook workbook = WorkbookFactory.create(fis);
+            Sheet sheet = workbook.getSheetAt(0); // 读取第一个工作表
+            
+            // 跳过表头，从第二行开始读取（第一行是字段描述）
+            for (int i = 1; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+                
+                Player player = new Player();
+                player.setSessionId(sessionId);
+                
+                // Excel列索引映射（根据实际Excel格式，从0开始）
+                // 0: 序号, 1: 提交时间, 2: 采用时间, 3: 来源, 4: 来源详情,
+                // 5: 来源IP, 6: 游戏ID, 7: 群内名称, 8: 历史最高段位
+                // 9: 当前段位, 10: 报名截图, 11: 常用位置, 12: 是否报名队长
+                // 13: 报名队长理由, 14: 自我介绍
+                
+                // colIndex 0: 序号 → groupId
+                Cell idCell = row.getCell(0);
+                if (idCell != null) {
+                    if (idCell.getCellType() == CellType.NUMERIC) {
+                        player.setGroupId((int) idCell.getNumericCellValue());
+                    } else if (idCell.getCellType() == CellType.STRING) {
+                        try {
+                            player.setGroupId(Integer.parseInt(idCell.getStringCellValue()));
+                        } catch (NumberFormatException e) {
+                            continue; // 跳过无效行
+                        }
+                    }
+                } else {
+                    continue; // 序号为空则跳过
+                }
+                
+                // colIndex 6: 游戏ID → gameId
+                Cell gameIdCell = row.getCell(6);
+                if (gameIdCell != null) {
+                    player.setGameId(getCellValueAsString(gameIdCell));
+                }
+                
+                // colIndex 7: 群内名称 → groupName
+                Cell groupNameCell = row.getCell(7);
+                if (groupNameCell != null) {
+                    player.setGroupName(getCellValueAsString(groupNameCell));
+                }
+                
+                // colIndex 8: 历史最高段位 - 跳过（只需要当前段位）
+                
+                // colIndex 9: 当前段位 → rank
+                Cell rankCell = row.getCell(9);
+                if (rankCell != null) {
+                    player.setRank(getCellValueAsString(rankCell));
+                }
+                
+                // colIndex 10: 报名截图 - 跳过
+                
+                // colIndex 11: 常用位置 → position
+                Cell positionCell = row.getCell(11);
+                if (positionCell != null) {
+                    String position = getCellValueAsString(positionCell);
+                    // Excel中用"|"分隔（如"上单 | 中单"），转换为逗号分隔
+                    player.setPosition(position.replace(" | ", ",").replace("|", ","));
+                }
+                
+                // colIndex 12: 是否报名队长 - 跳过
+                // colIndex 13: 报名队长理由 - 跳过
+                
+                // colIndex 14: 自我介绍 → heroes
+                Cell heroesCell = row.getCell(14);
+                if (heroesCell != null) {
+                    player.setHeroes(getCellValueAsString(heroesCell));
+                }
+                
+                // cost 默认所有人为 3
+                player.setCost(new BigDecimal("3"));
+                player.setStatus("POOL");
+                
+                players.add(player);
+            }
+            
+            workbook.close();
+        }
+        
+        return players;
+    }
+
+    @Override
     public Map<Integer, String> parseCaptainsFromExcel(MultipartFile file, List<Integer> captainIndices) throws Exception {
         Map<Integer, String> captains = new HashMap<>();
         
@@ -134,6 +225,37 @@ public class ExcelServiceImpl implements ExcelService {
         // 如果队长信息不在表头，可以尝试从第一列读取
         // 这里简化处理，实际应根据Excel格式调整
         workbook.close();
+        return captains;
+    }
+
+    @Override
+    public Map<Integer, String> parseCaptainsFromFilePath(String filePath, List<Integer> captainIndices) throws Exception {
+        Map<Integer, String> captains = new HashMap<>();
+        
+        // 从文件路径读取Excel文件
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(filePath)) {
+            Workbook workbook = WorkbookFactory.create(fis);
+            Sheet sheet = workbook.getSheetAt(0);
+            
+            // 假设队长信息在第一行（表头行）或者单独的工作表
+            // 这里假设队长信息在单独的列或者第一个工作表的特定行
+            // 根据实际需求调整：从表头行读取队长信息
+            Row headerRow = sheet.getRow(0);
+            if (headerRow != null) {
+                for (Integer index : captainIndices) {
+                    if (index > 0 && index <= headerRow.getLastCellNum()) {
+                        Cell cell = headerRow.getCell(index - 1); // Excel索引从1开始，Java从0开始
+                        if (cell != null) {
+                            String captainName = getCellValueAsString(cell);
+                            captains.put(index, captainName);
+                        }
+                    }
+                }
+            }
+            
+            workbook.close();
+        }
+        
         return captains;
     }
 

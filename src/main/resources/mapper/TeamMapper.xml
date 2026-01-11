@@ -41,6 +41,8 @@
     <update id="update">
         UPDATE team
         <set>
+            <if test="sessionId != null">sessionId = #{sessionId},</if>
+            <if test="captainId != null">captainId = #{captainId},</if>
             <if test="teamName != null">teamName = #{teamName},</if>
             <if test="captainName != null">captainName = #{captainName},</if>
             <if test="playerCount != null">playerCount = #{playerCount},</if>

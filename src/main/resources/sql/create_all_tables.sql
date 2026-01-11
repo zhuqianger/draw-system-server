@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS `player` (
 CREATE TABLE IF NOT EXISTS `team` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '队伍ID，主键，自增',
     `sessionId` BIGINT NOT NULL COMMENT '所属拍卖流程ID',
-    `captainId` BIGINT NOT NULL COMMENT '队长ID',
+    `captainId` BIGINT NULL COMMENT '队长ID（创建流程时可能为空，队长加入时更新）',
     `teamName` VARCHAR(50) COMMENT '队伍名称',
     `captainName` VARCHAR(50) COMMENT '队长名称（从Excel导入）',
     `playerCount` INT NOT NULL DEFAULT 0 COMMENT '队员数量，最多4人',

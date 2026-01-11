@@ -101,7 +101,7 @@ public class AuctionController {
         }
 
         try {
-            Team team = teamService.getByCaptainId(userId);
+            Team team = teamService.getByUserId(userId);
             if (team == null) {
                 return ResponseDTO.error("队伍不存在");
             }

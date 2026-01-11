@@ -36,6 +36,11 @@ public class TeamServiceImpl implements TeamService {
     }
 
     @Override
+    public Team getByUserId(Long userId) {
+        return teamMapper.selectByUserId(userId);
+    }
+
+    @Override
     public Team getById(Long id) {
         return teamMapper.selectById(id);
     }

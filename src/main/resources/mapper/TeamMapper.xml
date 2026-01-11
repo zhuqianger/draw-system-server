@@ -22,6 +22,10 @@
         SELECT * FROM team WHERE captainId = #{captainId} LIMIT 1
     </select>
 
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT * FROM team WHERE userId = #{userId} LIMIT 1
+    </select>
+
     <select id="selectBySessionId" resultMap="BaseResultMap">
         SELECT * FROM team WHERE sessionId = #{sessionId} ORDER BY id
     </select>

@@ -7,6 +7,7 @@ import java.util.List;
 public interface TeamService {
     Team createTeam(Long captainId, String teamName);
     Team getByCaptainId(Long captainId);
+    Team getByUserId(Long userId);
     Team getById(Long id);
     List<Team> getAllTeams();
     List<Team> getTeamsBySession(Long sessionId);

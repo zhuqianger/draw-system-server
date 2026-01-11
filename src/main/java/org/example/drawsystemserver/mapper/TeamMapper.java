@@ -9,6 +9,7 @@ import java.util.List;
 public interface TeamMapper {
     Team selectById(Long id);
     Team selectByCaptainId(Long captainId);
+    Team selectByUserId(Long userId);
     Team selectBySessionIdAndCaptainId(Long sessionId, Long captainId);
     List<Team> selectBySessionId(Long sessionId);
     List<Team> selectAll();

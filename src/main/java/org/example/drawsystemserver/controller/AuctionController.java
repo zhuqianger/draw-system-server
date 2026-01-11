@@ -131,8 +131,12 @@ public class AuctionController {
         }
 
         try {
-            auctionService.finishAuction(auctionId);
+            Auction auction = auctionService.finishAuction(auctionId);
             webSocketService.broadcastAuctionFinished(auctionId);
+            // 如果队员被分配，推送队员分配消息
+            if (auction.getWinningTeamId() != null && auction.getPlayerId() != null) {
+                webSocketService.broadcastPlayerAssigned(auction.getPlayerId(), auction.getWinningTeamId());
+            }
             return ResponseDTO.success("拍卖已结束");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());

@@ -19,13 +19,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns("/api/auth/login", "/ws/**");
     }
-
+    
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        // 双重保障：同时使用WebMvcConfigurer配置CORS
         registry.addMapping("/**")
                 .allowedOriginPatterns("*")
                 .allowedMethods("*")
                 .allowedHeaders("*")
-                .allowCredentials(true);
+                .allowCredentials(true)
+                .maxAge(3600);
     }
 }

@@ -36,12 +36,10 @@ public class ExcelServiceImpl implements ExcelService {
             
             Player player = new Player();
             player.setSessionId(sessionId);
-            
+
             // Excel列索引映射（根据实际Excel格式，从0开始）
-            // 0: 序号, 1: 提交时间, 2: 采用时间, 3: 来源, 4: 来源详情,
-            // 5: 来源IP, 6: 游戏ID, 7: 群内名称, 8: 历史最高段位
-            // 9: 当前段位, 10: 报名截图, 11: 常用位置, 12: 是否报名队长
-            // 13: 报名队长理由, 14: 自我介绍 15:费用
+            // 0: 序号, 1: 游戏ID, 2: 群内名称, 3: 历史最高段位, 4: 当前段位,
+            // 5: 常用位置, 6: 是否报名队长, 7: 自我介绍, 8: 是否已经进选手群 9.费用
             
             // colIndex 0: 序号 → groupId
             Cell idCell = row.getCell(0);
@@ -59,47 +57,44 @@ public class ExcelServiceImpl implements ExcelService {
                 continue; // 序号为空则跳过
             }
             
-            // colIndex 6: 游戏ID → gameId
-            Cell gameIdCell = row.getCell(6);
+            // colIndex 1: 游戏ID → gameId
+            Cell gameIdCell = row.getCell(1);
             if (gameIdCell != null) {
                 player.setGameId(getCellValueAsString(gameIdCell));
             }
             
-            // colIndex 7: 群内名称 → groupName
-            Cell groupNameCell = row.getCell(7);
+            // colIndex 2: 群内名称 → groupName
+            Cell groupNameCell = row.getCell(2);
             if (groupNameCell != null) {
                 player.setGroupName(getCellValueAsString(groupNameCell));
             }
             
-            // colIndex 8: 历史最高段位 - 跳过（只需要当前段位）
+            // colIndex 3: 历史最高段位 - 跳过（只需要当前段位）
             
-            // colIndex 9: 当前段位 → rank
-            Cell rankCell = row.getCell(9);
+            // colIndex 4: 当前段位 → rank
+            Cell rankCell = row.getCell(4);
             if (rankCell != null) {
                 player.setRank(getCellValueAsString(rankCell));
             }
             
-            // colIndex 10: 报名截图 - 跳过
-            
-            // colIndex 11: 常用位置 → position
-            Cell positionCell = row.getCell(11);
+            // colIndex 5: 常用位置 → position
+            Cell positionCell = row.getCell(5);
             if (positionCell != null) {
                 String position = getCellValueAsString(positionCell);
                 // Excel中用"|"分隔（如"上单 | 中单"），转换为逗号分隔
                 player.setPosition(position.replace(" | ", ",").replace("|", ","));
             }
             
-            // colIndex 12: 是否报名队长 - 跳过
-            // colIndex 13: 报名队长理由 - 跳过
-            
-            // colIndex 14: 自我介绍 → heroes
-            Cell heroesCell = row.getCell(14);
+            // colIndex 6: 自我介绍 → heroes
+            Cell heroesCell = row.getCell(7);
             if (heroesCell != null) {
                 player.setHeroes(getCellValueAsString(heroesCell));
             }
             
-            // colIndex 15: 费用 → cost
-            Cell costCell = row.getCell(15);
+            // colIndex 7: 是否已经进选手群 - 跳过
+            
+            // colIndex 8: 费用 → cost
+            Cell costCell = row.getCell(9);
             if (costCell != null) {
                 try {
                     BigDecimal cost = getCellValueAsBigDecimal(costCell);
@@ -143,11 +138,10 @@ public class ExcelServiceImpl implements ExcelService {
                 
                 Player player = new Player();
                 player.setSessionId(sessionId);
-                
+
                 // Excel列索引映射（根据实际Excel格式，从0开始）
-                // 0: 序号, 1: 游戏ID, 2: 群内名称, 3: 历史最高段位, 4: 来源详情,
-                // 5: 当前段位, 6: 常用位置, 7: 自我介绍, 8: 是否已经进选手群
-                // 9: 费用
+                // 0: 序号, 1: 游戏ID, 2: 群内名称, 3: 历史最高段位, 4: 当前段位,
+                // 5: 常用位置, 6: 是否报名队长, 7: 自我介绍, 8: 是否已经进选手群 9.费用
                 
                 // colIndex 0: 序号 → groupId
                 Cell idCell = row.getCell(0);
@@ -165,47 +159,44 @@ public class ExcelServiceImpl implements ExcelService {
                     continue; // 序号为空则跳过
                 }
                 
-                // colIndex 6: 游戏ID → gameId
-                Cell gameIdCell = row.getCell(6);
+                // colIndex 1: 游戏ID → gameId
+                Cell gameIdCell = row.getCell(1);
                 if (gameIdCell != null) {
                     player.setGameId(getCellValueAsString(gameIdCell));
                 }
                 
-                // colIndex 7: 群内名称 → groupName
-                Cell groupNameCell = row.getCell(7);
+                // colIndex 2: 群内名称 → groupName
+                Cell groupNameCell = row.getCell(2);
                 if (groupNameCell != null) {
                     player.setGroupName(getCellValueAsString(groupNameCell));
                 }
                 
-                // colIndex 8: 历史最高段位 - 跳过（只需要当前段位）
+                // colIndex 3: 历史最高段位 - 跳过（只需要当前段位）
                 
-                // colIndex 9: 当前段位 → rank
-                Cell rankCell = row.getCell(9);
+                // colIndex 4: 当前段位 → rank
+                Cell rankCell = row.getCell(4);
                 if (rankCell != null) {
                     player.setRank(getCellValueAsString(rankCell));
                 }
                 
-                // colIndex 10: 报名截图 - 跳过
-                
-                // colIndex 11: 常用位置 → position
-                Cell positionCell = row.getCell(11);
+                // colIndex 5: 常用位置 → position
+                Cell positionCell = row.getCell(5);
                 if (positionCell != null) {
                     String position = getCellValueAsString(positionCell);
                     // Excel中用"|"分隔（如"上单 | 中单"），转换为逗号分隔
                     player.setPosition(position.replace(" | ", ",").replace("|", ","));
                 }
                 
-                // colIndex 12: 是否报名队长 - 跳过
-                // colIndex 13: 报名队长理由 - 跳过
-                
-                // colIndex 14: 自我介绍 → heroes
-                Cell heroesCell = row.getCell(14);
+                // colIndex 6: 自我介绍 → heroes
+                Cell heroesCell = row.getCell(7);
                 if (heroesCell != null) {
                     player.setHeroes(getCellValueAsString(heroesCell));
                 }
                 
-                // colIndex 15: 费用 → cost
-                Cell costCell = row.getCell(15);
+                // colIndex 7: 是否已经进选手群 - 跳过
+                
+                // colIndex 8: 费用 → cost
+                Cell costCell = row.getCell(9);
                 if (costCell != null) {
                     try {
                         BigDecimal cost = getCellValueAsBigDecimal(costCell);

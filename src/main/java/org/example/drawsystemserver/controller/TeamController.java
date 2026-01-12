@@ -148,7 +148,7 @@ public class TeamController {
         dataStyle.setVerticalAlignment(VerticalAlignment.CENTER);
         
         // 创建表头 - 每个队伍一行，包含所有队员信息
-        // 格式：队伍名称、队长名字、队长费用、队员1名字、队员1费用、队员1拍卖费用、队员2名字、队员2费用、队员2拍卖费用、队员3名字、队员3费用、队员3拍卖费用、队伍总费用、剩余费用
+        // 格式：队伍名称、队长名字、队长费用、队员1名字、队员1费用、队员1拍卖费用、队员2名字、队员2费用、队员2拍卖费用、队员3名字、队员3费用、队员3拍卖费用、队员4名字、队员4费用、队员4拍卖费用、队伍总费用、剩余费用
         Row headerRow = sheet.createRow(0);
         String[] headers = {
             "队伍名称", 
@@ -157,6 +157,7 @@ public class TeamController {
             "队员1名字", "队员1费用", "队员1拍卖费用",
             "队员2名字", "队员2费用", "队员2拍卖费用",
             "队员3名字", "队员3费用", "队员3拍卖费用",
+            "队员4名字", "队员4费用", "队员4拍卖费用",
             "队伍总费用", 
             "剩余费用"
         };
@@ -203,9 +204,9 @@ public class TeamController {
                 System.out.println("  Player ID: " + p.getId() + ", Name: " + p.getGroupName() + ", TeamId: " + p.getTeamId());
             }
             
-            // 最多3个非队长队员（因为队长已经单独列出）
-            // 填充队员1、队员2、队员3的信息
-            for (int i = 0; i < 3; i++) {
+            // 最多4个非队长队员（因为队长已经单独列出，队伍总共5人：1个队长+4个队员）
+            // 填充队员1、队员2、队员3、队员4的信息
+            for (int i = 0; i < 4; i++) {
                 if (i < nonCaptainPlayers.size()) {
                     Player player = nonCaptainPlayers.get(i);
                     // 队员名字

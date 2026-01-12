@@ -249,10 +249,11 @@ public class AuctionServiceImpl implements AuctionService {
 
         bidMapper.insert(bid);
         
-        // 如果出到最高价，直接获得该队员
+        // 如果出到最高价，停止倒计时（设置endTime为当前时间），但仍需要管理员手动点击结束拍卖确认
         if (auction.getMaxPrice() != null && amount.compareTo(auction.getMaxPrice()) >= 0) {
-            // 立即结束拍卖，该队伍获胜
-            finishAuction(auctionId);
+            LocalDateTime now = LocalDateTime.now();
+            auction.setEndTime(now); // 停止倒计时
+            auctionMapper.update(auction);
         }
         
         return bid;
@@ -261,6 +262,13 @@ public class AuctionServiceImpl implements AuctionService {
     @Override
     @Transactional
     public Auction finishAuction(Long auctionId) {
+        // 默认是管理员手动结束
+        return finishAuction(auctionId, false);
+    }
+
+    @Override
+    @Transactional
+    public Auction finishAuction(Long auctionId, boolean autoFinish) {
         Auction auction = auctionMapper.selectById(auctionId);
         if (auction == null || "FINISHED".equals(auction.getStatus()) || "CANCELLED".equals(auction.getStatus())) {
             throw new RuntimeException("拍卖不存在或已结束");
@@ -289,13 +297,19 @@ public class AuctionServiceImpl implements AuctionService {
                 // 减少队伍剩余费用（减去获胜出价）
                 teamMapper.decreaseNowCost(highestBid.getTeamId(), highestBid.getAmount());
             }
+            
+            // 有出价时，直接结束拍卖
+            auction.setStatus("FINISHED");
+            auction.setPhase(null);
+            auctionMapper.update(auction);
+            return auction;
         } else {
             // 没有竞价
-            if ("FIRST_PHASE".equals(auction.getStatus())) {
-                // 第一阶段没有出价，进入捡漏环节
+            if (autoFinish && "FIRST_PHASE".equals(auction.getStatus())) {
+                // 自动结束且是第一阶段，进入捡漏环节
                 return enterPickupPhase(auctionId);
             } else {
-                // 捡漏环节也没有出价，将队员放回待拍卖池
+                // 管理员手动结束，或者捡漏环节自动结束，直接结束拍卖，将队员放回待拍卖池
                 Player player = playerMapper.selectById(auction.getPlayerId());
                 if (player != null) {
                     player.setStatus("POOL");
@@ -303,16 +317,11 @@ public class AuctionServiceImpl implements AuctionService {
                     playerMapper.update(player);
                 }
                 auction.setStatus("FINISHED");
+                auction.setPhase(null);
                 auctionMapper.update(auction);
+                return auction;
             }
-            return auction;
         }
-
-        auction.setStatus("FINISHED");
-        auction.setPhase(null);
-        auctionMapper.update(auction);
-        
-        return auction;
     }
 
     @Override

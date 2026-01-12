@@ -147,59 +147,86 @@ public class TeamController {
         dataStyle.setBorderRight(BorderStyle.THIN);
         dataStyle.setVerticalAlignment(VerticalAlignment.CENTER);
         
-        // 创建表头
+        // 创建表头 - 每个队伍一行，包含所有队员信息
+        // 格式：队伍名称、队长名字、队长费用、队员1名字、队员1费用、队员1拍卖费用、队员2名字、队员2费用、队员2拍卖费用、队员3名字、队员3费用、队员3拍卖费用、队伍总费用、剩余费用
         Row headerRow = sheet.createRow(0);
-        String[] headers = {"队伍名称", "队长名字", "队长费用", "队员名字", "队员费用", "拍卖费用", "队伍总费用", "剩余费用"};
+        String[] headers = {
+            "队伍名称", 
+            "队长名字", 
+            "队长费用", 
+            "队员1名字", "队员1费用", "队员1拍卖费用",
+            "队员2名字", "队员2费用", "队员2拍卖费用",
+            "队员3名字", "队员3费用", "队员3拍卖费用",
+            "队伍总费用", 
+            "剩余费用"
+        };
         for (int i = 0; i < headers.length; i++) {
             Cell cell = headerRow.createCell(i);
             cell.setCellValue(headers[i]);
             cell.setCellStyle(headerStyle);
         }
         
-        // 填充数据
+        // 填充数据 - 每个队伍一行
         int rowNum = 1;
         for (Team team : teams) {
+            Row row = sheet.createRow(rowNum++);
+            int colIndex = 0;
+            
+            // 队伍名称
+            createCell(row, colIndex++, team.getTeamName(), dataStyle);
+            
             // 获取队长信息
             Player captain = playerMapper.selectById(team.getCaptainId());
             String captainName = captain != null ? captain.getGroupName() : team.getCaptainName();
             BigDecimal captainCost = captain != null && captain.getCost() != null ? captain.getCost() : BigDecimal.ZERO;
             
-            // 先输出队长信息
-            Row captainRow = sheet.createRow(rowNum++);
-            createCell(captainRow, 0, team.getTeamName(), dataStyle);
-            createCell(captainRow, 1, captainName, dataStyle);
-            createCell(captainRow, 2, captainCost, dataStyle);
-            createCell(captainRow, 3, captainName, dataStyle);
-            createCell(captainRow, 4, captainCost, dataStyle);
-            createCell(captainRow, 5, BigDecimal.ZERO, dataStyle); // 队长拍卖费用为0
-            createCell(captainRow, 6, team.getTotalCost(), dataStyle);
-            createCell(captainRow, 7, team.getNowCost(), dataStyle);
+            // 队长名字
+            createCell(row, colIndex++, captainName != null ? captainName : "-", dataStyle);
+            // 队长费用
+            createCell(row, colIndex++, captainCost, dataStyle);
             
-            // 获取队员列表（排除队长）- 直接在SQL查询中排除队长
+            // 获取所有队员（包括队长）
+            List<Player> allPlayers = playerMapper.selectByTeamId(team.getId());
+            
+            // 在代码中过滤掉队长，确保逻辑正确
             Long captainId = team.getCaptainId();
-            List<Player> nonCaptainPlayers;
-            if (captainId != null) {
-                // 使用SQL查询直接排除队长，更可靠
-                nonCaptainPlayers = playerMapper.selectByTeamIdExcludingCaptain(team.getId(), captainId);
-            } else {
-                // 如果队长ID为null，获取所有队员（这种情况不应该发生，但为了安全）
-                nonCaptainPlayers = playerMapper.selectByTeamId(team.getId());
+            List<Player> nonCaptainPlayers = allPlayers.stream()
+                .filter(p -> captainId == null || !p.getId().equals(captainId))
+                .collect(Collectors.toList());
+            
+            // 调试输出（可以后续删除）
+            System.out.println("Team ID: " + team.getId() + ", Team Name: " + team.getTeamName());
+            System.out.println("Captain ID: " + captainId);
+            System.out.println("All players count: " + allPlayers.size());
+            System.out.println("Non-captain players count: " + nonCaptainPlayers.size());
+            for (Player p : allPlayers) {
+                System.out.println("  Player ID: " + p.getId() + ", Name: " + p.getGroupName() + ", TeamId: " + p.getTeamId());
             }
             
-            // 为每个非队长队员创建一行
-            for (Player player : nonCaptainPlayers) {
-                Row row = sheet.createRow(rowNum++);
-                createCell(row, 0, team.getTeamName(), dataStyle);
-                createCell(row, 1, captainName, dataStyle);
-                createCell(row, 2, captainCost, dataStyle);
-                createCell(row, 3, player.getGroupName() != null ? player.getGroupName() : "-", dataStyle);
-                createCell(row, 4, player.getCost() != null ? player.getCost() : BigDecimal.ZERO, dataStyle);
-                // 拍卖费用：从map中获取
-                BigDecimal bidAmount = playerBidAmountMap.getOrDefault(player.getId(), BigDecimal.ZERO);
-                createCell(row, 5, bidAmount, dataStyle);
-                createCell(row, 6, team.getTotalCost(), dataStyle);
-                createCell(row, 7, team.getNowCost(), dataStyle);
+            // 最多3个非队长队员（因为队长已经单独列出）
+            // 填充队员1、队员2、队员3的信息
+            for (int i = 0; i < 3; i++) {
+                if (i < nonCaptainPlayers.size()) {
+                    Player player = nonCaptainPlayers.get(i);
+                    // 队员名字
+                    createCell(row, colIndex++, player.getGroupName() != null ? player.getGroupName() : "-", dataStyle);
+                    // 队员费用
+                    createCell(row, colIndex++, player.getCost() != null ? player.getCost() : BigDecimal.ZERO, dataStyle);
+                    // 队员拍卖费用
+                    BigDecimal bidAmount = playerBidAmountMap.getOrDefault(player.getId(), BigDecimal.ZERO);
+                    createCell(row, colIndex++, bidAmount, dataStyle);
+                } else {
+                    // 如果没有更多队员，填充空值
+                    createCell(row, colIndex++, "-", dataStyle);
+                    createCell(row, colIndex++, BigDecimal.ZERO, dataStyle);
+                    createCell(row, colIndex++, BigDecimal.ZERO, dataStyle);
+                }
             }
+            
+            // 队伍总费用
+            createCell(row, colIndex++, team.getTotalCost(), dataStyle);
+            // 剩余费用
+            createCell(row, colIndex++, team.getNowCost(), dataStyle);
         }
         
         // 自动调整列宽

@@ -165,17 +165,20 @@ public class AuctionController {
     }
 
     /**
-     * 管理员结束拍卖
+     * 管理员结束拍卖或自动结束拍卖
      */
     @PostMapping("/finish/{auctionId}")
-    public ResponseDTO<String> finishAuction(@PathVariable Long auctionId, HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
-        if (!userService.isAdmin(userId)) {
-            return ResponseDTO.error(403, "只有管理员可以结束拍卖");
+    public ResponseDTO<String> finishAuction(@PathVariable Long auctionId, @RequestParam(defaultValue = "false") Boolean autoFinish, HttpServletRequest request) {
+        // 如果不是自动结束，需要检查管理员权限
+        if (!autoFinish) {
+            Long userId = (Long) request.getAttribute("userId");
+            if (!userService.isAdmin(userId)) {
+                return ResponseDTO.error(403, "只有管理员可以结束拍卖");
+            }
         }
 
         try {
-            Auction auction = auctionService.finishAuction(auctionId);
+            Auction auction = auctionService.finishAuction(auctionId, autoFinish);
             webSocketService.broadcastAuctionFinished(auctionId);
             
             // 如果进入捡漏环节，推送消息

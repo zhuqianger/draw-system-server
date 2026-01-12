@@ -1,5 +1,6 @@
 package org.example.drawsystemserver.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -14,6 +15,8 @@ public class Team {
     private String teamName;
     private String captainName; // 队长名称（从Excel导入）
     private Integer playerCount; // 队员数量，最多4人
+    private BigDecimal totalCost; // 队伍总费用（Excel费用平均数×5）
+    private BigDecimal nowCost; // 队伍当前剩余费用
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     
@@ -78,6 +81,22 @@ public class Team {
 
     public void setPlayerCount(Integer playerCount) {
         this.playerCount = playerCount;
+    }
+
+    public BigDecimal getTotalCost() {
+        return totalCost;
+    }
+
+    public void setTotalCost(BigDecimal totalCost) {
+        this.totalCost = totalCost;
+    }
+
+    public BigDecimal getNowCost() {
+        return nowCost;
+    }
+
+    public void setNowCost(BigDecimal nowCost) {
+        this.nowCost = nowCost;
     }
 
     public LocalDateTime getCreateTime() {

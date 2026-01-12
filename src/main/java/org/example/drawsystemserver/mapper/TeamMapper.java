@@ -1,8 +1,10 @@
 package org.example.drawsystemserver.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.example.drawsystemserver.entity.Team;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Mapper
@@ -17,4 +19,5 @@ public interface TeamMapper {
     int update(Team team);
     int incrementPlayerCount(Long id);
     int decrementPlayerCount(Long id);
+    int decreaseNowCost(@Param("id") Long id, @Param("amount") BigDecimal amount);
 }

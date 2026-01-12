@@ -80,6 +80,9 @@ public class TeamController {
         dto.setCaptainId(team.getCaptainId());
         dto.setTeamName(team.getTeamName());
         dto.setPlayerCount(team.getPlayerCount());
+        dto.setTotalCost(team.getTotalCost());
+        dto.setNowCost(team.getNowCost());
+        dto.setUserId(team.getUserId());
 
         // captainName从player表的groupName获取（captainId是player表的id）
         var captainPlayer = playerMapper.selectById(team.getCaptainId());

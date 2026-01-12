@@ -1,5 +1,6 @@
 package org.example.drawsystemserver.dto;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -11,6 +12,9 @@ public class TeamDTO {
     private String captainName;
     private String teamName;
     private Integer playerCount;
+    private BigDecimal totalCost; // 队伍总费用
+    private BigDecimal nowCost; // 队伍当前剩余费用
+    private Long userId; // 队长用户ID
     private List<PlayerDTO> players;
 
     public TeamDTO() {
@@ -54,6 +58,30 @@ public class TeamDTO {
 
     public void setPlayerCount(Integer playerCount) {
         this.playerCount = playerCount;
+    }
+
+    public BigDecimal getTotalCost() {
+        return totalCost;
+    }
+
+    public void setTotalCost(BigDecimal totalCost) {
+        this.totalCost = totalCost;
+    }
+
+    public BigDecimal getNowCost() {
+        return nowCost;
+    }
+
+    public void setNowCost(BigDecimal nowCost) {
+        this.nowCost = nowCost;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public void setUserId(Long userId) {
+        this.userId = userId;
     }
 
     public List<PlayerDTO> getPlayers() {

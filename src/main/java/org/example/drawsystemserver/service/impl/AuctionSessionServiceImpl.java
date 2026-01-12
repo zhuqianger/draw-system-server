@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -60,6 +62,25 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                 playerMapper.insert(player);
             }
             
+            // 计算所有队员费用的平均值
+            List<BigDecimal> validCosts = players.stream()
+                .filter(p -> p.getCost() != null)
+                .map(Player::getCost)
+                .collect(Collectors.toList());
+            
+            BigDecimal averageCost;
+            if (validCosts.isEmpty()) {
+                // 如果没有有效费用，使用默认值3
+                averageCost = new BigDecimal("3");
+            } else {
+                averageCost = validCosts.stream()
+                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .divide(new BigDecimal(validCosts.size()), 2, RoundingMode.HALF_UP);
+            }
+            
+            // 计算队伍总费用（平均值×5）
+            BigDecimal totalCost = averageCost.multiply(new BigDecimal("5"));
+            
             // 获取该session下所有已插入的player（用于查找队长player）
             List<Player> allPlayers = playerMapper.selectBySessionId(session.getId());
             
@@ -84,6 +105,10 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                     throw new RuntimeException("未找到groupId为 " + captainGroupId + " 的player");
                 }
                 
+                // 计算当前剩余费用（总费用 - 队长费用）
+                BigDecimal captainCost = captainPlayer.getCost() != null ? captainPlayer.getCost() : BigDecimal.ZERO;
+                BigDecimal nowCost = totalCost.subtract(captainCost);
+                
                 Team team = new Team();
                 team.setSessionId(session.getId());
                 team.setCaptainId(captainPlayer.getId()); // captainId设置为player表中的id
@@ -91,6 +116,8 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                 team.setCaptainName(captainPlayer.getGroupName()); // captainName从player表的groupName获取
                 team.setTeamName((i + 1) + "号队伍"); // teamName按照下标设置为"1号队伍"、"2号队伍"等
                 team.setPlayerCount(0);
+                team.setTotalCost(totalCost);
+                team.setNowCost(nowCost);
                 teamMapper.insert(team);
                 
                 // 更新队长player的teamId

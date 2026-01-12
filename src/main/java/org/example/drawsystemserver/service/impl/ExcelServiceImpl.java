@@ -40,7 +40,7 @@ public class ExcelServiceImpl implements ExcelService {
             // 0: 序号, 1: 提交时间, 2: 采用时间, 3: 来源, 4: 来源详情,
             // 5: 来源IP, 6: 游戏ID, 7: 群内名称, 8: 历史最高段位
             // 9: 当前段位, 10: 报名截图, 11: 常用位置, 12: 是否报名队长
-            // 13: 报名队长理由, 14: 自我介绍
+            // 13: 报名队长理由, 14: 自我介绍 15:费用
             
             // colIndex 0: 序号 → groupId
             Cell idCell = row.getCell(0);
@@ -91,14 +91,32 @@ public class ExcelServiceImpl implements ExcelService {
             // colIndex 12: 是否报名队长 - 跳过
             // colIndex 13: 报名队长理由 - 跳过
             
-            // colIndex 14: 自我杰斯（自我介绍） → heroes
+            // colIndex 14: 自我介绍 → heroes
             Cell heroesCell = row.getCell(14);
             if (heroesCell != null) {
                 player.setHeroes(getCellValueAsString(heroesCell));
             }
             
-            // cost 默认所有人为 3
-            player.setCost(new BigDecimal("3"));
+            // colIndex 15: 费用 → cost
+            Cell costCell = row.getCell(15);
+            if (costCell != null) {
+                try {
+                    BigDecimal cost = getCellValueAsBigDecimal(costCell);
+                    if (cost != null) {
+                        player.setCost(cost);
+                    } else {
+                        // 如果解析失败，使用默认值3
+                        player.setCost(new BigDecimal("3"));
+                    }
+                } catch (Exception e) {
+                    // 解析失败，使用默认值3
+                    player.setCost(new BigDecimal("3"));
+                }
+            } else {
+                // 如果单元格为空，使用默认值3
+                player.setCost(new BigDecimal("3"));
+            }
+            
             player.setStatus("POOL");
             
             players.add(player);
@@ -129,7 +147,7 @@ public class ExcelServiceImpl implements ExcelService {
                 // 0: 序号, 1: 提交时间, 2: 采用时间, 3: 来源, 4: 来源详情,
                 // 5: 来源IP, 6: 游戏ID, 7: 群内名称, 8: 历史最高段位
                 // 9: 当前段位, 10: 报名截图, 11: 常用位置, 12: 是否报名队长
-                // 13: 报名队长理由, 14: 自我介绍
+                // 13: 报名队长理由, 14: 自我介绍, 15: 费用
                 
                 // colIndex 0: 序号 → groupId
                 Cell idCell = row.getCell(0);
@@ -186,8 +204,26 @@ public class ExcelServiceImpl implements ExcelService {
                     player.setHeroes(getCellValueAsString(heroesCell));
                 }
                 
-                // cost 默认所有人为 3
-                player.setCost(new BigDecimal("3"));
+                // colIndex 15: 费用 → cost
+                Cell costCell = row.getCell(15);
+                if (costCell != null) {
+                    try {
+                        BigDecimal cost = getCellValueAsBigDecimal(costCell);
+                        if (cost != null) {
+                            player.setCost(cost);
+                        } else {
+                            // 如果解析失败，使用默认值3
+                            player.setCost(new BigDecimal("3"));
+                        }
+                    } catch (Exception e) {
+                        // 解析失败，使用默认值3
+                        player.setCost(new BigDecimal("3"));
+                    }
+                } else {
+                    // 如果单元格为空，使用默认值3
+                    player.setCost(new BigDecimal("3"));
+                }
+                
                 player.setStatus("POOL");
                 
                 players.add(player);
@@ -318,6 +354,52 @@ public class ExcelServiceImpl implements ExcelService {
         
         // 清理特殊字符（Unicode不可见字符）
         return cleanSpecialCharacters(value);
+    }
+    
+    /**
+     * 将单元格值转换为BigDecimal
+     */
+    private BigDecimal getCellValueAsBigDecimal(Cell cell) {
+        if (cell == null) {
+            return null;
+        }
+        
+        try {
+            switch (cell.getCellType()) {
+                case NUMERIC:
+                    // 如果是数字类型，直接转换为BigDecimal
+                    double numericValue = cell.getNumericCellValue();
+                    return BigDecimal.valueOf(numericValue);
+                case STRING:
+                    // 如果是字符串类型，尝试解析为数字
+                    String strValue = cell.getStringCellValue().trim();
+                    if (strValue.isEmpty()) {
+                        return null;
+                    }
+                    // 移除可能的货币符号、逗号等
+                    strValue = strValue.replaceAll("[￥$€£,，]", "").trim();
+                    return new BigDecimal(strValue);
+                case FORMULA:
+                    // 如果是公式，尝试获取计算结果
+                    try {
+                        double formulaValue = cell.getNumericCellValue();
+                        return BigDecimal.valueOf(formulaValue);
+                    } catch (Exception e) {
+                        // 如果公式结果是字符串，尝试解析
+                        String formulaStr = cell.getStringCellValue().trim();
+                        if (formulaStr.isEmpty()) {
+                            return null;
+                        }
+                        formulaStr = formulaStr.replaceAll("[￥$€£,，]", "").trim();
+                        return new BigDecimal(formulaStr);
+                    }
+                default:
+                    return null;
+            }
+        } catch (Exception e) {
+            // 解析失败返回null
+            return null;
+        }
     }
     
     /**

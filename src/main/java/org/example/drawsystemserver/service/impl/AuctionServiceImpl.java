@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -99,6 +100,11 @@ public class AuctionServiceImpl implements AuctionService {
         if (team.getPlayerCount() >= 4) {
             throw new RuntimeException("队伍已满员（最多4人）");
         }
+        
+        // 检查出价是否超过队伍剩余费用
+        if (team.getNowCost() == null || amount.compareTo(team.getNowCost()) > 0) {
+            throw new RuntimeException("出价不能超过队伍剩余费用（剩余：" + team.getNowCost() + "）");
+        }
 
         // 检查出价是否高于当前最高价
         Bid highestBid = bidMapper.selectHighestByAuctionId(auctionId);
@@ -145,6 +151,9 @@ public class AuctionServiceImpl implements AuctionService {
                 
                 // 增加队伍队员数量
                 teamMapper.incrementPlayerCount(highestBid.getTeamId());
+                
+                // 减少队伍剩余费用（减去获胜出价）
+                teamMapper.decreaseNowCost(highestBid.getTeamId(), highestBid.getAmount());
             }
         } else {
             // 没有竞价，将队员放回待拍卖池

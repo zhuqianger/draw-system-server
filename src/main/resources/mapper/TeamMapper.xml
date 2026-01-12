@@ -10,6 +10,8 @@
         <result column="teamName" property="teamName"/>
         <result column="captainName" property="captainName"/>
         <result column="playerCount" property="playerCount"/>
+        <result column="totalCost" property="totalCost"/>
+        <result column="nowCost" property="nowCost"/>
         <result column="createTime" property="createTime"/>
         <result column="updateTime" property="updateTime"/>
     </resultMap>
@@ -39,8 +41,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO team (sessionId, captainId, userId, teamName, captainName, playerCount)
-        VALUES (#{sessionId}, #{captainId}, #{userId}, #{teamName}, #{captainName}, #{playerCount})
+        INSERT INTO team (sessionId, captainId, userId, teamName, captainName, playerCount, totalCost, nowCost)
+        VALUES (#{sessionId}, #{captainId}, #{userId}, #{teamName}, #{captainName}, #{playerCount}, #{totalCost}, #{nowCost})
     </insert>
 
     <update id="update">
@@ -52,6 +54,8 @@
             <if test="teamName != null">teamName = #{teamName},</if>
             <if test="captainName != null">captainName = #{captainName},</if>
             <if test="playerCount != null">playerCount = #{playerCount},</if>
+            <if test="totalCost != null">totalCost = #{totalCost},</if>
+            <if test="nowCost != null">nowCost = #{nowCost},</if>
         </set>
         WHERE id = #{id}
     </update>
@@ -62,6 +66,10 @@
 
     <update id="decrementPlayerCount">
         UPDATE team SET playerCount = playerCount - 1 WHERE id = #{id} AND playerCount > 0
+    </update>
+
+    <update id="decreaseNowCost">
+        UPDATE team SET nowCost = nowCost - #{amount} WHERE id = #{id}
     </update>
 
 </mapper>

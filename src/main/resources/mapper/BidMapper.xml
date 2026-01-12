@@ -58,4 +58,14 @@
         UPDATE bid SET isWinner = #{isWinner} WHERE auctionId = #{auctionId} AND id = #{bidId}
     </update>
 
+    <delete id="deleteByAuctionId">
+        DELETE FROM bid WHERE auctionId = #{auctionId}
+    </delete>
+
+    <delete id="deleteBySessionId">
+        DELETE b FROM bid b
+        INNER JOIN auction a ON b.auctionId = a.id
+        WHERE a.sessionId = #{sessionId}
+    </delete>
+
 </mapper>

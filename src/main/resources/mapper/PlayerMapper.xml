@@ -81,4 +81,8 @@
         UPDATE player SET teamId = #{teamId} WHERE id = #{id}
     </update>
 
+    <delete id="deleteBySessionId">
+        DELETE FROM player WHERE sessionId = #{sessionId}
+    </delete>
+
 </mapper>

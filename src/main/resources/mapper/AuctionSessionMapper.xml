@@ -44,4 +44,8 @@
         UPDATE auction_session SET status = #{status} WHERE id = #{id}
     </update>
 
+    <delete id="deleteById">
+        DELETE FROM auction_session WHERE id = #{id}
+    </delete>
+
 </mapper>

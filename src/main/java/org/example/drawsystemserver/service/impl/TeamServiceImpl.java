@@ -58,6 +58,7 @@ public class TeamServiceImpl implements TeamService {
     @Override
     public boolean isTeamFull(Long teamId) {
         Team team = teamMapper.selectById(teamId);
+        // playerCount表示队员数量（不包括队长），所以满员是4个队员（加上队长共5人）
         return team != null && team.getPlayerCount() >= 4;
     }
 }

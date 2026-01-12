@@ -20,4 +20,5 @@ public interface PlayerMapper {
     int updateStatus(Long id, String status);
     int updateCurrentAuctionId(Long id, Long auctionId);
     int updateTeamId(Long id, Long teamId);
+    int deleteBySessionId(Long sessionId);
 }

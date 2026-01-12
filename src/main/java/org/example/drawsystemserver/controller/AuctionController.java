@@ -151,7 +151,7 @@ public class AuctionController {
             }
 
             if (teamService.isTeamFull(team.getId())) {
-                return ResponseDTO.error("队伍已满员（最多4人）");
+                return ResponseDTO.error("队伍已满员（最多5人：1个队长+4个队员）");
             }
 
             Bid bid = auctionService.placeBid(bidDTO.getAuctionId(), team.getId(), userId, bidDTO.getAmount());

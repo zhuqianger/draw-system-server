@@ -69,7 +69,11 @@
     </update>
 
     <update id="decreaseNowCost">
-        UPDATE team SET nowCost = nowCost - #{amount} WHERE id = #{id}
+        UPDATE team SET nowCost = nowCost - #{amount} WHERE id = #{id} AND nowCost >= #{amount}
     </update>
+
+    <delete id="deleteBySessionId">
+        DELETE FROM team WHERE sessionId = #{sessionId}
+    </delete>
 
 </mapper>

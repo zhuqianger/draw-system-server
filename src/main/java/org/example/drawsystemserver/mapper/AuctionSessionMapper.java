@@ -13,4 +13,5 @@ public interface AuctionSessionMapper {
     int insert(AuctionSession session);
     int update(AuctionSession session);
     int updateStatus(Long id, String status);
+    int deleteById(Long id);
 }

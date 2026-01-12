@@ -145,10 +145,9 @@ public class ExcelServiceImpl implements ExcelService {
                 player.setSessionId(sessionId);
                 
                 // Excel列索引映射（根据实际Excel格式，从0开始）
-                // 0: 序号, 1: 提交时间, 2: 采用时间, 3: 来源, 4: 来源详情,
-                // 5: 来源IP, 6: 游戏ID, 7: 群内名称, 8: 历史最高段位
-                // 9: 当前段位, 10: 报名截图, 11: 常用位置, 12: 是否报名队长
-                // 13: 报名队长理由, 14: 自我介绍, 15: 费用
+                // 0: 序号, 1: 游戏ID, 2: 群内名称, 3: 历史最高段位, 4: 来源详情,
+                // 5: 当前段位, 6: 常用位置, 7: 自我介绍, 8: 是否已经进选手群
+                // 9: 费用
                 
                 // colIndex 0: 序号 → groupId
                 Cell idCell = row.getCell(0);

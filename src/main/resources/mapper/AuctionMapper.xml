@@ -78,4 +78,8 @@
         WHERE id = #{id}
     </update>
 
+    <delete id="deleteBySessionId">
+        DELETE FROM auction WHERE sessionId = #{sessionId}
+    </delete>
+
 </mapper>

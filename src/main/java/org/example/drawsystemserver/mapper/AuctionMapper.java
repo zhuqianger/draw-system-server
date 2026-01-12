@@ -18,4 +18,5 @@ public interface AuctionMapper {
     int update(Auction auction);
     int updateStatus(Long id, String status);
     int updateWinning(Long id, Long winningBidId, Long winningTeamId);
+    int deleteBySessionId(Long sessionId);
 }

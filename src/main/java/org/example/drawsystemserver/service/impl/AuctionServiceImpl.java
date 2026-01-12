@@ -184,25 +184,40 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("拍卖时间已结束");
         }
 
-        // 检查队伍是否已满员（最多4人）
+        // 检查队伍是否已满员（总共5人：1个队长+4个队员）
         Team team = teamMapper.selectById(teamId);
         if (team == null) {
             throw new RuntimeException("队伍不存在");
         }
-        if (team.getPlayerCount() >= 4) {
-            throw new RuntimeException("队伍已满员（最多4人）");
+        
+        // 调试信息：输出队伍信息
+        System.out.println("=== 出价检查 ===");
+        System.out.println("队伍ID: " + team.getId());
+        System.out.println("队伍名称: " + team.getTeamName());
+        System.out.println("playerCount: " + team.getPlayerCount());
+        System.out.println("totalCost: " + team.getTotalCost());
+        System.out.println("nowCost: " + team.getNowCost());
+        System.out.println("出价金额: " + amount);
+        
+        // playerCount表示队员数量（不包括队长），所以满员是4个队员（加上队长共5人）
+        if (team.getPlayerCount() == null || team.getPlayerCount() >= 4) {
+            throw new RuntimeException("队伍已满员（最多5人：1个队长+4个队员，当前队员数：" + (team.getPlayerCount() != null ? team.getPlayerCount() : "null") + "）");
         }
         
         // 检查出价是否超过队伍剩余费用
-        if (team.getNowCost() == null || amount.compareTo(team.getNowCost()) > 0) {
-            throw new RuntimeException("出价不能超过队伍剩余费用（剩余：" + team.getNowCost() + "）");
+        if (team.getNowCost() == null) {
+            throw new RuntimeException("队伍剩余费用未设置，无法出价");
+        }
+        if (amount.compareTo(team.getNowCost()) > 0) {
+            throw new RuntimeException("出价不能超过队伍剩余费用（剩余：¥" + team.getNowCost().toPlainString() + "，出价：¥" + amount.toPlainString() + "）");
         }
         
         // 检查出价后剩余费用是否足够：出价后剩余费用必须 >= 还差的队员数-1（因为出价后要减去这个出价，还要再招remainingSlots-1个队员）
-        int remainingSlots = 4 - team.getPlayerCount(); // 还差几个队员
+        // 总共需要4个队员（不包括队长），还差 remainingSlots 个队员
+        int remainingSlots = 4 - team.getPlayerCount(); // 还差几个队员（不包括队长）
         BigDecimal remainingCostAfterBid = team.getNowCost().subtract(amount);
         if (remainingSlots > 1 && remainingCostAfterBid.compareTo(new BigDecimal(remainingSlots - 1)) < 0) {
-            throw new RuntimeException("出价后剩余费用不足，无法出价（出价后剩余：" + remainingCostAfterBid + "，还需：" + (remainingSlots - 1) + "）");
+            throw new RuntimeException("出价后剩余费用不足，无法出价（出价后剩余：¥" + remainingCostAfterBid.toPlainString() + "，还需：" + (remainingSlots - 1) + "个队员，每个至少需要¥1.00）");
         }
 
         // 检查出价是否低于起拍价

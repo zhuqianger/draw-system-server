@@ -18,4 +18,6 @@ public interface BidMapper {
     int update(Bid bid);
     int updateIsWinner(@Param("auctionId") Long auctionId, @Param("bidId") Long bidId, @Param("isWinner") Boolean isWinner);
     BigDecimal selectMaxAmountByAuctionId(Long auctionId);
+    int deleteByAuctionId(Long auctionId);
+    int deleteBySessionId(Long sessionId); // 删除指定session的所有bid（通过auction关联）
 }

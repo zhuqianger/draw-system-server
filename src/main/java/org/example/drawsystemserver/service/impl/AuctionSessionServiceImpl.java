@@ -35,6 +35,12 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
     @Autowired
     private ExcelService excelService;
 
+    @Autowired
+    private AuctionMapper auctionMapper;
+
+    @Autowired
+    private BidMapper bidMapper;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Override
@@ -159,13 +165,29 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public AuctionSession deleteSession(Long sessionId) {
         AuctionSession session = sessionMapper.selectById(sessionId);
-        if (session != null) {
-            session.setStatus("DELETED");
-            sessionMapper.update(session);
+        if (session == null) {
+            return null;
         }
+        
+        // 删除顺序：按照外键依赖关系，从子表到父表
+        // 1. 删除bid表（依赖auction）
+        bidMapper.deleteBySessionId(sessionId);
+        
+        // 2. 删除auction表（依赖player和team）
+        auctionMapper.deleteBySessionId(sessionId);
+        
+        // 3. 删除player表（依赖session）
+        playerMapper.deleteBySessionId(sessionId);
+        
+        // 4. 删除team表（依赖session）
+        teamMapper.deleteBySessionId(sessionId);
+        
+        // 5. 最后删除auction_session表
+        sessionMapper.deleteById(sessionId);
+        
         return session;
     }
 

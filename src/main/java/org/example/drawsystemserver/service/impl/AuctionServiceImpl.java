@@ -204,12 +204,23 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("队伍已满员（最多5人：1个队长+4个队员，当前队员数：" + (team.getPlayerCount() != null ? team.getPlayerCount() : "null") + "）");
         }
         
-        // 检查出价是否超过队伍剩余费用
+        // 检查出价是否是0.5的倍数
+        BigDecimal half = new BigDecimal("0.5");
+        // 将出价乘以2，然后检查是否能被1整除
+        BigDecimal multiplied = amount.multiply(new BigDecimal("2"));
+        BigDecimal remainder = multiplied.remainder(BigDecimal.ONE);
+        if (remainder.compareTo(BigDecimal.ZERO) != 0) {
+            throw new RuntimeException("出价必须是0.5的倍数（当前出价：" + amount.toPlainString() + "）");
+        }
+        
+        // 检查出价是否超过队伍剩余费用（向下取整到0.5的倍数）
         if (team.getNowCost() == null) {
             throw new RuntimeException("队伍剩余费用未设置，无法出价");
         }
-        if (amount.compareTo(team.getNowCost()) > 0) {
-            throw new RuntimeException("出价不能超过队伍剩余费用（剩余：¥" + team.getNowCost().toPlainString() + "，出价：¥" + amount.toPlainString() + "）");
+        // 将剩余费用向下取整到0.5的倍数
+        BigDecimal maxAllowedBid = team.getNowCost().divide(half, 0, java.math.RoundingMode.DOWN).multiply(half);
+        if (amount.compareTo(maxAllowedBid) > 0) {
+            throw new RuntimeException("出价不能超过队伍剩余费用（剩余：¥" + team.getNowCost().toPlainString() + "，最高可出：¥" + maxAllowedBid.toPlainString() + "，出价：¥" + amount.toPlainString() + "）");
         }
         
         // 检查出价后剩余费用是否足够：出价后剩余费用必须 >= 还差的队员数-1（因为出价后要减去这个出价，还要再招remainingSlots-1个队员）
@@ -218,16 +229,6 @@ public class AuctionServiceImpl implements AuctionService {
         BigDecimal remainingCostAfterBid = team.getNowCost().subtract(amount);
         if (remainingSlots > 1 && remainingCostAfterBid.compareTo(new BigDecimal(remainingSlots - 1)) < 0) {
             throw new RuntimeException("出价后剩余费用不足，无法出价（出价后剩余：¥" + remainingCostAfterBid.toPlainString() + "，还需：" + (remainingSlots - 1) + "个队员，每个至少需要¥1.00）");
-        }
-
-        // 检查出价是否低于起拍价
-        if (auction.getStartingPrice() != null && amount.compareTo(auction.getStartingPrice()) < 0) {
-            throw new RuntimeException("出价不能低于起拍价（起拍价：" + auction.getStartingPrice() + "）");
-        }
-
-        // 检查出价是否超过最高价
-        if (auction.getMaxPrice() != null && amount.compareTo(auction.getMaxPrice()) > 0) {
-            throw new RuntimeException("出价不能超过最高价（最高价：" + auction.getMaxPrice() + "）");
         }
 
         // 获取当前最高价
@@ -242,8 +243,24 @@ public class AuctionServiceImpl implements AuctionService {
             minBidAmount = auction.getStartingPrice();
         }
         
+        // 确保最低出价不低于起拍价（费用下限）
+        if (auction.getStartingPrice() != null && minBidAmount.compareTo(auction.getStartingPrice()) < 0) {
+            minBidAmount = auction.getStartingPrice();
+        }
+        
+        // 检查出价是否低于最低出价（起拍价或当前最高价+0.5）
         if (amount.compareTo(minBidAmount) < 0) {
-            throw new RuntimeException("出价必须至少为 " + minBidAmount);
+            throw new RuntimeException("出价不能低于最低出价（最低出价：" + minBidAmount.toPlainString() + "，起拍价：" + auction.getStartingPrice().toPlainString() + "）");
+        }
+        
+        // 检查出价是否低于起拍价（费用下限）
+        if (auction.getStartingPrice() != null && amount.compareTo(auction.getStartingPrice()) < 0) {
+            throw new RuntimeException("出价不能低于起拍价（起拍价：" + auction.getStartingPrice().toPlainString() + "）");
+        }
+
+        // 检查出价是否超过最高价（费用上限：基础定价 + 3）
+        if (auction.getMaxPrice() != null && amount.compareTo(auction.getMaxPrice()) > 0) {
+            throw new RuntimeException("出价不能超过最高价（最高价：" + auction.getMaxPrice().toPlainString() + "，基础定价 + 3）");
         }
 
         // 检查加价幅度：每次加价最少0.5

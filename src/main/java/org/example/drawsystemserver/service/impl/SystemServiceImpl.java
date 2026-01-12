@@ -130,7 +130,6 @@ public class SystemServiceImpl implements SystemService {
         dto.setId(team.getId());
         dto.setCaptainId(team.getCaptainId());
         dto.setTeamName(team.getTeamName());
-        dto.setPlayerCount(team.getPlayerCount());
         dto.setTotalCost(team.getTotalCost());
         dto.setNowCost(team.getNowCost());
         dto.setUserId(team.getUserId());
@@ -144,8 +143,22 @@ public class SystemServiceImpl implements SystemService {
             dto.setCaptainName(team.getCaptainName());
         }
 
-        List<Player> players = playerMapper.selectByTeamId(team.getId());
-        dto.setPlayers(players.stream()
+        // 获取该队伍的所有队员（不包括队长）
+        List<Player> players = playerMapper.selectByTeamIdExcludingCaptain(team.getId(), team.getCaptainId());
+        
+        // 基于实际队员数量计算playerCount（不包括队长）
+        int actualPlayerCount = players.size();
+        dto.setPlayerCount(actualPlayerCount);
+        
+        // 如果数据库中的playerCount和实际队员数量不一致，更新数据库
+        if (team.getPlayerCount() == null || !team.getPlayerCount().equals(actualPlayerCount)) {
+            team.setPlayerCount(actualPlayerCount);
+            teamMapper.update(team);
+        }
+
+        // 包括队长在内的所有队员（用于显示）
+        List<Player> allPlayers = playerMapper.selectByTeamId(team.getId());
+        dto.setPlayers(allPlayers.stream()
                 .map(this::convertToPlayerDTO)
                 .collect(Collectors.toList()));
 

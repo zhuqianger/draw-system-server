@@ -6,13 +6,17 @@ import org.example.drawsystemserver.entity.Bid;
 import java.util.List;
 
 public interface AuctionService {
-    Auction startAuction(Long sessionId, Long playerId, Integer durationSeconds);
+    Auction createAuction(Long sessionId, Long playerId); // 创建拍卖（抽取后，等待开始）
+    Auction beginAuction(Long auctionId); // 管理员点击开始拍卖
     Auction getCurrentAuction();
     Auction getCurrentAuctionBySession(Long sessionId);
     Auction getById(Long id);
     Bid placeBid(Long auctionId, Long teamId, Long captainId, java.math.BigDecimal amount);
     Auction finishAuction(Long auctionId);
+    Auction enterPickupPhase(Long auctionId); // 进入捡漏环节
     List<Auction> getActiveAuctions();
     Bid getHighestBid(Long auctionId);
     List<Bid> getRecentBids(Long auctionId, int limit);
+    // 兼容旧接口
+    Auction startAuction(Long sessionId, Long playerId, Integer durationSeconds);
 }

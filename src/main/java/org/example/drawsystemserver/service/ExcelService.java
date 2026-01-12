@@ -3,6 +3,7 @@ package org.example.drawsystemserver.service;
 import org.example.drawsystemserver.entity.Player;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -12,4 +13,5 @@ public interface ExcelService {
     Map<Integer, String> parseCaptainsFromExcel(MultipartFile file, List<Integer> captainIndices) throws Exception;
     Map<Integer, String> parseCaptainsFromFilePath(String filePath, List<Integer> captainIndices) throws Exception;
     String saveFile(MultipartFile file) throws Exception;
+    void exportTeamsToExcel(Long sessionId, OutputStream outputStream) throws Exception;
 }

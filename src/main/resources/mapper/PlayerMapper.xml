@@ -39,6 +39,10 @@
         SELECT * FROM player WHERE teamId = #{teamId} ORDER BY id
     </select>
 
+    <select id="selectByTeamIdExcludingCaptain" resultMap="BaseResultMap">
+        SELECT * FROM player WHERE teamId = #{teamId} AND id != #{captainId} ORDER BY id
+    </select>
+
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT * FROM player ORDER BY id
     </select>

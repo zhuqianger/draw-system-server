@@ -53,7 +53,49 @@ public class AuctionController {
     private UserMapper userMapper;
 
     /**
-     * 管理员开始拍卖（从待拍卖池抽取队员）
+     * 管理员抽取队员（创建拍卖，等待开始）
+     */
+    @PostMapping("/create")
+    public ResponseDTO<AuctionDTO> createAuction(@RequestParam Long sessionId, @RequestParam Long playerId, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以抽取队员");
+        }
+
+        try {
+            Auction auction = auctionService.createAuction(sessionId, playerId);
+            webSocketService.broadcastAuctionStart(auction.getId());
+
+            AuctionDTO dto = convertToDTO(auction);
+            return ResponseDTO.success("队员已抽取，等待开始拍卖", dto);
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员开始拍卖（点击开始按钮）
+     */
+    @PostMapping("/begin/{auctionId}")
+    public ResponseDTO<AuctionDTO> beginAuction(@PathVariable Long auctionId, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以开始拍卖");
+        }
+
+        try {
+            Auction auction = auctionService.beginAuction(auctionId);
+            webSocketService.broadcastAuctionStart(auction.getId());
+
+            AuctionDTO dto = convertToDTO(auction);
+            return ResponseDTO.success("拍卖已开始", dto);
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 兼容旧接口：管理员开始拍卖（从待拍卖池抽取队员）
      */
     @PostMapping("/start")
     public ResponseDTO<AuctionDTO> startAuction(@RequestParam Long sessionId, @RequestParam Long playerId, @RequestParam(defaultValue = "60") Integer duration, HttpServletRequest request) {
@@ -63,7 +105,9 @@ public class AuctionController {
         }
 
         try {
-            Auction auction = auctionService.startAuction(sessionId, playerId, duration);
+            // 创建并自动开始
+            Auction auction = auctionService.createAuction(sessionId, playerId);
+            auction = auctionService.beginAuction(auction.getId());
             webSocketService.broadcastAuctionStart(auction.getId());
 
             AuctionDTO dto = convertToDTO(auction);
@@ -133,6 +177,13 @@ public class AuctionController {
         try {
             Auction auction = auctionService.finishAuction(auctionId);
             webSocketService.broadcastAuctionFinished(auctionId);
+            
+            // 如果进入捡漏环节，推送消息
+            if ("PICKUP_PHASE".equals(auction.getStatus())) {
+                webSocketService.broadcastAuctionStart(auctionId);
+                return ResponseDTO.success("第一阶段结束，进入捡漏环节");
+            }
+            
             // 如果队员被分配，推送队员分配消息
             if (auction.getWinningTeamId() != null && auction.getPlayerId() != null) {
                 webSocketService.broadcastPlayerAssigned(auction.getPlayerId(), auction.getWinningTeamId());
@@ -163,6 +214,9 @@ public class AuctionController {
         dto.setEndTime(auction.getEndTime());
         dto.setDuration(auction.getDuration());
         dto.setStatus(auction.getStatus());
+        dto.setPhase(auction.getPhase());
+        dto.setStartingPrice(auction.getStartingPrice());
+        dto.setMaxPrice(auction.getMaxPrice());
 
         Player player = playerMapper.selectById(auction.getPlayerId());
         if (player != null) {

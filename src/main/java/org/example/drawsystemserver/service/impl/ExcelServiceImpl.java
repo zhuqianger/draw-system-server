@@ -9,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -421,5 +422,11 @@ public class ExcelServiceImpl implements ExcelService {
         // \uFEFF (ZERO WIDTH NO-BREAK SPACE)
         return str.replaceAll("[\u2066\u2067\u2068\u2069\u200B\u200C\u200D\uFEFF]", "")
                   .trim();
+    }
+    
+    @Override
+    public void exportTeamsToExcel(Long sessionId, OutputStream outputStream) throws Exception {
+        // 这个方法将在TeamController中实现，因为需要访问多个Mapper
+        throw new UnsupportedOperationException("此方法应在TeamController中实现");
     }
 }

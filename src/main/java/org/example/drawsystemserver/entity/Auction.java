@@ -14,7 +14,10 @@ public class Auction {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private Integer duration; // 拍卖时长（秒）
-    private String status; // ACTIVE-进行中, FINISHED-已结束, CANCELLED-已取消
+    private String status; // WAITING-等待开始, FIRST_PHASE-第一阶段, PICKUP_PHASE-捡漏环节, FINISHED-已结束, CANCELLED-已取消
+    private String phase; // 阶段：WAITING-等待开始, FIRST_PHASE-第一阶段(30s), PICKUP_PHASE-捡漏环节(20s)
+    private BigDecimal startingPrice; // 起拍价
+    private BigDecimal maxPrice; // 最高出价（基础定价+3）
     private Long winningBidId; // 获胜竞价ID
     private Long winningTeamId; // 获胜队伍ID
     private LocalDateTime createTime;
@@ -74,6 +77,30 @@ public class Auction {
 
     public void setDuration(Integer duration) {
         this.duration = duration;
+    }
+
+    public String getPhase() {
+        return phase;
+    }
+
+    public void setPhase(String phase) {
+        this.phase = phase;
+    }
+
+    public BigDecimal getStartingPrice() {
+        return startingPrice;
+    }
+
+    public void setStartingPrice(BigDecimal startingPrice) {
+        this.startingPrice = startingPrice;
+    }
+
+    public BigDecimal getMaxPrice() {
+        return maxPrice;
+    }
+
+    public void setMaxPrice(BigDecimal maxPrice) {
+        this.maxPrice = maxPrice;
     }
 
     public String getStatus() {

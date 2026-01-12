@@ -21,6 +21,9 @@ public class AuctionDTO {
     private LocalDateTime endTime;
     private Integer duration;
     private String status;
+    private String phase; // 阶段：WAITING-等待开始, FIRST_PHASE-第一阶段, PICKUP_PHASE-捡漏环节
+    private BigDecimal startingPrice; // 起拍价
+    private BigDecimal maxPrice; // 最高出价
     private BigDecimal highestBidAmount;
     private Long highestBidTeamId;
     private String highestBidTeamName;
@@ -133,6 +136,30 @@ public class AuctionDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getPhase() {
+        return phase;
+    }
+
+    public void setPhase(String phase) {
+        this.phase = phase;
+    }
+
+    public BigDecimal getStartingPrice() {
+        return startingPrice;
+    }
+
+    public void setStartingPrice(BigDecimal startingPrice) {
+        this.startingPrice = startingPrice;
+    }
+
+    public BigDecimal getMaxPrice() {
+        return maxPrice;
+    }
+
+    public void setMaxPrice(BigDecimal maxPrice) {
+        this.maxPrice = maxPrice;
     }
 
     public BigDecimal getHighestBidAmount() {

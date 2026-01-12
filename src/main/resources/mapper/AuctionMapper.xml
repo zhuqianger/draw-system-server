@@ -10,6 +10,9 @@
         <result column="endTime" property="endTime"/>
         <result column="duration" property="duration"/>
         <result column="status" property="status"/>
+        <result column="phase" property="phase"/>
+        <result column="startingPrice" property="startingPrice"/>
+        <result column="maxPrice" property="maxPrice"/>
         <result column="winningBidId" property="winningBidId"/>
         <result column="winningTeamId" property="winningTeamId"/>
         <result column="createTime" property="createTime"/>
@@ -25,15 +28,19 @@
     </select>
 
     <select id="selectCurrentActive" resultMap="BaseResultMap">
-        SELECT * FROM auction WHERE status = 'ACTIVE' ORDER BY startTime DESC LIMIT 1
+        SELECT * FROM auction WHERE status IN ('WAITING', 'FIRST_PHASE', 'PICKUP_PHASE') ORDER BY createTime DESC LIMIT 1
     </select>
 
     <select id="selectCurrentActiveBySessionId" resultMap="BaseResultMap">
-        SELECT * FROM auction WHERE sessionId = #{sessionId} AND status = 'ACTIVE' ORDER BY startTime DESC LIMIT 1
+        SELECT * FROM auction WHERE sessionId = #{sessionId} AND status IN ('WAITING', 'FIRST_PHASE', 'PICKUP_PHASE') ORDER BY createTime DESC LIMIT 1
     </select>
 
     <select id="selectByStatus" resultMap="BaseResultMap">
         SELECT * FROM auction WHERE status = #{status} ORDER BY startTime DESC
+    </select>
+
+    <select id="selectBySessionId" resultMap="BaseResultMap">
+        SELECT * FROM auction WHERE sessionId = #{sessionId} ORDER BY startTime DESC
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
@@ -41,8 +48,8 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO auction (sessionId, playerId, startTime, endTime, duration, status)
-        VALUES (#{sessionId}, #{playerId}, #{startTime}, #{endTime}, #{duration}, #{status})
+        INSERT INTO auction (sessionId, playerId, startTime, endTime, duration, status, phase, startingPrice, maxPrice)
+        VALUES (#{sessionId}, #{playerId}, #{startTime}, #{endTime}, #{duration}, #{status}, #{phase}, #{startingPrice}, #{maxPrice})
     </insert>
 
     <update id="update">
@@ -53,6 +60,9 @@
             <if test="endTime != null">endTime = #{endTime},</if>
             <if test="duration != null">duration = #{duration},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="phase != null">phase = #{phase},</if>
+            <if test="startingPrice != null">startingPrice = #{startingPrice},</if>
+            <if test="maxPrice != null">maxPrice = #{maxPrice},</if>
             <if test="winningBidId != null">winningBidId = #{winningBidId},</if>
             <if test="winningTeamId != null">winningTeamId = #{winningTeamId},</if>
         </set>

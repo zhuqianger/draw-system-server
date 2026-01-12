@@ -1,6 +1,7 @@
 package org.example.drawsystemserver.mapper;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.example.drawsystemserver.entity.Player;
 
 import java.util.List;
@@ -12,6 +13,7 @@ public interface PlayerMapper {
     List<Player> selectBySessionId(Long sessionId);
     List<Player> selectBySessionIdAndStatus(Long sessionId, String status);
     List<Player> selectByTeamId(Long teamId);
+    List<Player> selectByTeamIdExcludingCaptain(@Param("teamId") Long teamId, @Param("captainId") Long captainId);
     List<Player> selectAll();
     int insert(Player player);
     int update(Player player);

@@ -145,9 +145,16 @@ public class AuctionController {
         }
 
         try {
-            Team team = teamService.getByUserId(userId);
+            // 先获取拍卖信息，确认sessionId
+            Auction auction = auctionService.getById(bidDTO.getAuctionId());
+            if (auction == null) {
+                return ResponseDTO.error("拍卖不存在");
+            }
+            
+            // 根据sessionId和userId查询队伍，确保是当前session的队伍
+            Team team = teamMapper.selectBySessionIdAndUserId(auction.getSessionId(), userId);
             if (team == null) {
-                return ResponseDTO.error("队伍不存在");
+                return ResponseDTO.error("队伍不存在或不属于当前拍卖流程（sessionId=" + auction.getSessionId() + "）");
             }
 
             if (teamService.isTeamFull(team.getId())) {

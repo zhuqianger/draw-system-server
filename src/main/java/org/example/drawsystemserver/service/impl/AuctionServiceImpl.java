@@ -183,6 +183,18 @@ public class AuctionServiceImpl implements AuctionService {
         if (auction.getStartTime() == null || LocalDateTime.now().isAfter(auction.getEndTime())) {
             throw new RuntimeException("拍卖时间已结束");
         }
+        
+        // 检查是否已经过了5秒的等待期
+        // 第一阶段：30秒，需要开始后至少5秒才能出价（剩余时间<=25秒）
+        // 捡漏阶段：20秒，需要开始后至少5秒才能出价（剩余时间<=15秒）
+        LocalDateTime now = LocalDateTime.now();
+        long secondsSinceStart = java.time.Duration.between(auction.getStartTime(), now).getSeconds();
+        int minWaitSeconds = 5; // 等待期5秒
+        
+        if (secondsSinceStart < minWaitSeconds) {
+            long remainingWait = minWaitSeconds - secondsSinceStart;
+            throw new RuntimeException("拍卖开始后需要等待" + minWaitSeconds + "秒才能出价（还需等待" + remainingWait + "秒）");
+        }
 
         // 检查队伍是否已满员（总共5人：1个队长+4个队员）
         Team team = teamMapper.selectById(teamId);
@@ -190,9 +202,15 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("队伍不存在");
         }
         
+        // 验证队伍是否属于当前拍卖的session
+        if (!auction.getSessionId().equals(team.getSessionId())) {
+            throw new RuntimeException("队伍不属于当前拍卖流程（sessionId不匹配：拍卖sessionId=" + auction.getSessionId() + "，队伍sessionId=" + team.getSessionId() + "）");
+        }
+        
         // 调试信息：输出队伍信息
         System.out.println("=== 出价检查 ===");
-        System.out.println("队伍ID: " + team.getId());
+        System.out.println("拍卖ID: " + auction.getId() + ", SessionID: " + auction.getSessionId());
+        System.out.println("队伍ID: " + team.getId() + ", SessionID: " + team.getSessionId() + ", UserID: " + team.getUserId());
         System.out.println("队伍名称: " + team.getTeamName());
         System.out.println("playerCount: " + team.getPlayerCount());
         System.out.println("totalCost: " + team.getTotalCost());
@@ -315,9 +333,23 @@ public class AuctionServiceImpl implements AuctionService {
             auction.setWinningBidId(highestBid.getId());
             auction.setWinningTeamId(highestBid.getTeamId());
             
+            // 验证获胜队伍是否属于当前拍卖的session
+            Team winningTeam = teamMapper.selectById(highestBid.getTeamId());
+            if (winningTeam == null) {
+                throw new RuntimeException("获胜队伍不存在（teamId=" + highestBid.getTeamId() + "）");
+            }
+            if (!auction.getSessionId().equals(winningTeam.getSessionId())) {
+                throw new RuntimeException("获胜队伍不属于当前拍卖流程（拍卖sessionId=" + auction.getSessionId() + "，队伍sessionId=" + winningTeam.getSessionId() + "）");
+            }
+            
             // 将队员分配给获胜队伍
             Player player = playerMapper.selectById(auction.getPlayerId());
             if (player != null) {
+                // 验证队员是否属于当前拍卖的session
+                if (!auction.getSessionId().equals(player.getSessionId())) {
+                    throw new RuntimeException("队员不属于当前拍卖流程（拍卖sessionId=" + auction.getSessionId() + "，队员sessionId=" + player.getSessionId() + "）");
+                }
+                
                 player.setStatus("SOLD");
                 player.setTeamId(highestBid.getTeamId());
                 player.setCurrentAuctionId(null);

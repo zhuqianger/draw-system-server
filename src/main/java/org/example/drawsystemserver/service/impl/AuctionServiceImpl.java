@@ -207,16 +207,6 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("队伍不属于当前拍卖流程（sessionId不匹配：拍卖sessionId=" + auction.getSessionId() + "，队伍sessionId=" + team.getSessionId() + "）");
         }
         
-        // 调试信息：输出队伍信息
-        System.out.println("=== 出价检查 ===");
-        System.out.println("拍卖ID: " + auction.getId() + ", SessionID: " + auction.getSessionId());
-        System.out.println("队伍ID: " + team.getId() + ", SessionID: " + team.getSessionId() + ", UserID: " + team.getUserId());
-        System.out.println("队伍名称: " + team.getTeamName());
-        System.out.println("playerCount: " + team.getPlayerCount());
-        System.out.println("totalCost: " + team.getTotalCost());
-        System.out.println("nowCost: " + team.getNowCost());
-        System.out.println("出价金额: " + amount);
-        
         // playerCount表示队员数量（不包括队长），所以满员是4个队员（加上队长共5人）
         if (team.getPlayerCount() == null || team.getPlayerCount() >= 4) {
             throw new RuntimeException("队伍已满员（最多5人：1个队长+4个队员，当前队员数：" + (team.getPlayerCount() != null ? team.getPlayerCount() : "null") + "）");
@@ -301,8 +291,8 @@ public class AuctionServiceImpl implements AuctionService {
         
         // 如果出到最高价，停止倒计时（设置endTime为当前时间），但仍需要管理员手动点击结束拍卖确认
         if (auction.getMaxPrice() != null && amount.compareTo(auction.getMaxPrice()) >= 0) {
-            LocalDateTime now = LocalDateTime.now();
-            auction.setEndTime(now); // 停止倒计时
+            LocalDateTime nowTime = LocalDateTime.now();
+            auction.setEndTime(nowTime); // 停止倒计时
             auctionMapper.update(auction);
         }
         
@@ -324,7 +314,7 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("拍卖不存在或已结束");
         }
 
-        // 找到最高竞价
+        // 找到最高竞价（检查是否有队长出价）
         Bid highestBid = bidMapper.selectHighestByAuctionId(auctionId);
         
         if (highestBid != null) {
@@ -368,9 +358,10 @@ public class AuctionServiceImpl implements AuctionService {
             auctionMapper.update(auction);
             return auction;
         } else {
-            // 没有竞价
+            // 没有竞价（没有队长出价）
+            // 第一阶段自动结束：如果第一阶段30s倒计时结束且无人出价，进入捡漏环节
             if (autoFinish && "FIRST_PHASE".equals(auction.getStatus())) {
-                // 自动结束且是第一阶段，进入捡漏环节
+                // 自动结束且是第一阶段，检查是否有出价，如果没有则进入捡漏环节
                 return enterPickupPhase(auctionId);
             } else {
                 // 管理员手动结束，或者捡漏环节自动结束，直接结束拍卖，将队员放回待拍卖池

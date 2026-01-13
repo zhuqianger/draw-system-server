@@ -39,6 +39,14 @@
         SELECT * FROM auction WHERE status = #{status} ORDER BY startTime DESC
     </select>
 
+    <select id="selectExpiredAuctions" resultMap="BaseResultMap">
+        SELECT * FROM auction 
+        WHERE status IN ('FIRST_PHASE', 'PICKUP_PHASE') 
+        AND endTime IS NOT NULL 
+        AND endTime &lt;= NOW()
+        ORDER BY endTime ASC
+    </select>
+
     <select id="selectBySessionId" resultMap="BaseResultMap">
         SELECT * FROM auction WHERE sessionId = #{sessionId} ORDER BY startTime DESC
     </select>

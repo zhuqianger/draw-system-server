@@ -195,14 +195,6 @@ public class TeamController {
                 .filter(p -> captainId == null || !p.getId().equals(captainId))
                 .collect(Collectors.toList());
             
-            // 调试输出（可以后续删除）
-            System.out.println("Team ID: " + team.getId() + ", Team Name: " + team.getTeamName());
-            System.out.println("Captain ID: " + captainId);
-            System.out.println("All players count: " + allPlayers.size());
-            System.out.println("Non-captain players count: " + nonCaptainPlayers.size());
-            for (Player p : allPlayers) {
-                System.out.println("  Player ID: " + p.getId() + ", Name: " + p.getGroupName() + ", TeamId: " + p.getTeamId());
-            }
             
             // 最多4个非队长队员（因为队长已经单独列出，队伍总共5人：1个队长+4个队员）
             // 填充队员1、队员2、队员3、队员4的信息

@@ -14,6 +14,7 @@ public interface AuctionMapper {
     List<Auction> selectByStatus(String status);
     List<Auction> selectBySessionId(Long sessionId);
     List<Auction> selectAll();
+    List<Auction> selectExpiredAuctions(); // 查询已过期但未结束的拍卖（endTime已过但状态为FIRST_PHASE或PICKUP_PHASE）
     int insert(Auction auction);
     int update(Auction auction);
     int updateStatus(Long id, String status);

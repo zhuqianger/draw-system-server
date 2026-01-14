@@ -71,6 +71,11 @@ public class AuctionServiceImpl implements AuctionService {
         auction.setPhase("WAITING");
         auction.setStartingPrice(startingPrice);
         auction.setMaxPrice(maxPrice);
+        
+        // 确保价格已正确设置
+        if (auction.getStartingPrice() == null || auction.getMaxPrice() == null) {
+            throw new RuntimeException("拍卖价格计算失败：startingPrice=" + auction.getStartingPrice() + ", maxPrice=" + auction.getMaxPrice());
+        }
 
         auctionMapper.insert(auction);
 
@@ -307,7 +312,7 @@ public class AuctionServiceImpl implements AuctionService {
     }
 
     @Override
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Auction finishAuction(Long auctionId, boolean autoFinish) {
         Auction auction = auctionMapper.selectById(auctionId);
         if (auction == null || "FINISHED".equals(auction.getStatus()) || "CANCELLED".equals(auction.getStatus())) {
@@ -346,10 +351,38 @@ public class AuctionServiceImpl implements AuctionService {
                 playerMapper.update(player);
                 
                 // 增加队伍队员数量
-                teamMapper.incrementPlayerCount(highestBid.getTeamId());
+                int playerCountResult = teamMapper.incrementPlayerCount(highestBid.getTeamId());
+                if (playerCountResult == 0) {
+                    throw new RuntimeException("更新队伍队员数量失败（teamId=" + highestBid.getTeamId() + "）");
+                }
                 
                 // 减少队伍剩余费用（减去获胜出价）
-                teamMapper.decreaseNowCost(highestBid.getTeamId(), highestBid.getAmount());
+                // 使用SELECT FOR UPDATE锁定行，防止并发问题
+                Team currentTeam = teamMapper.selectByIdForUpdate(highestBid.getTeamId());
+                if (currentTeam == null) {
+                    throw new RuntimeException("队伍不存在（teamId=" + highestBid.getTeamId() + "）");
+                }
+                if (currentTeam.getNowCost() == null) {
+                    throw new RuntimeException("队伍剩余费用未设置（teamId=" + highestBid.getTeamId() + "）");
+                }
+                if (currentTeam.getNowCost().compareTo(highestBid.getAmount()) < 0) {
+                    throw new RuntimeException("队伍剩余费用不足（剩余：" + currentTeam.getNowCost().toPlainString() + "，需要扣除：" + highestBid.getAmount().toPlainString() + "）");
+                }
+                
+                // 使用原子操作扣除费用
+                int costResult = teamMapper.decreaseNowCost(highestBid.getTeamId(), highestBid.getAmount());
+                if (costResult == 0) {
+                    throw new RuntimeException("扣除队伍剩余费用失败（teamId=" + highestBid.getTeamId() + "，amount=" + highestBid.getAmount().toPlainString() + "，当前剩余：" + currentTeam.getNowCost().toPlainString() + "）");
+                }
+                
+                // 验证扣除后的费用（可选，用于调试）
+                Team updatedTeam = teamMapper.selectById(highestBid.getTeamId());
+                if (updatedTeam != null && updatedTeam.getNowCost() != null) {
+                    BigDecimal expectedCost = currentTeam.getNowCost().subtract(highestBid.getAmount());
+                    if (updatedTeam.getNowCost().compareTo(expectedCost) != 0) {
+                        throw new RuntimeException("扣除费用后数据不一致（期望：" + expectedCost.toPlainString() + "，实际：" + updatedTeam.getNowCost().toPlainString() + "）");
+                    }
+                }
             }
             
             // 有出价时，直接结束拍卖

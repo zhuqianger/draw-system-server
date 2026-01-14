@@ -20,6 +20,10 @@
         SELECT * FROM team WHERE id = #{id}
     </select>
 
+    <select id="selectByIdForUpdate" resultMap="BaseResultMap">
+        SELECT * FROM team WHERE id = #{id} FOR UPDATE
+    </select>
+
     <select id="selectByCaptainId" resultMap="BaseResultMap">
         SELECT * FROM team WHERE captainId = #{captainId} LIMIT 1
     </select>
@@ -73,7 +77,7 @@
     </update>
 
     <update id="decreaseNowCost">
-        UPDATE team SET nowCost = nowCost - #{amount} WHERE id = #{id} AND nowCost >= #{amount}
+        UPDATE team SET nowCost = nowCost - #{amount} WHERE id = #{id} AND nowCost IS NOT NULL AND nowCost >= #{amount}
     </update>
 
     <delete id="deleteBySessionId">

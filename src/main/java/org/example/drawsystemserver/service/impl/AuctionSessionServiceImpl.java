@@ -68,7 +68,7 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                 playerMapper.insert(player);
             }
             
-            // 计算所有队员费用的平均值
+            // 计算所有队员费用的平均值（用于计算nowCost，但totalCost固定为18）
             List<BigDecimal> validCosts = players.stream()
                 .filter(p -> p.getCost() != null)
                 .map(Player::getCost)
@@ -84,8 +84,8 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                     .divide(new BigDecimal(validCosts.size()), 2, RoundingMode.HALF_UP);
             }
             
-            // 计算队伍总费用（平均值×5）
-            BigDecimal totalCost = averageCost.multiply(new BigDecimal("5"));
+            // 队伍总费用固定为18（包括队长和4个队员的费用总和）
+            BigDecimal totalCost = new BigDecimal("18");
             
             // 获取该session下所有已插入的player（用于查找队长player）
             List<Player> allPlayers = playerMapper.selectBySessionId(session.getId());

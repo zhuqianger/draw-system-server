@@ -21,5 +21,6 @@ public interface TeamMapper {
     int incrementPlayerCount(Long id);
     int decrementPlayerCount(Long id);
     int decreaseNowCost(@Param("id") Long id, @Param("amount") BigDecimal amount);
+    Team selectByIdForUpdate(Long id); // 使用SELECT FOR UPDATE锁定行
     int deleteBySessionId(Long sessionId);
 }

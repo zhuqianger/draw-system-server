@@ -40,14 +40,14 @@ public class AuctionScheduledTask {
     @Scheduled(fixedRate = 1000) // 每1秒执行一次
     public void checkExpiredAuctions() {
         try {
-            // 查询已过期但未结束的拍卖
+            // 查询已过期但未结束的拍卖（endTime <= NOW()）
             List<Auction> expiredAuctions = auctionMapper.selectExpiredAuctions();
             
             for (Auction auction : expiredAuctions) {
                 try {
                     java.time.LocalDateTime now = java.time.LocalDateTime.now();
                     
-                    // 检查是否是第一阶段且无人出价
+                    // 优先处理第一阶段无人出价的情况
                     if ("FIRST_PHASE".equals(auction.getStatus())) {
                         Bid highestBid = bidMapper.selectHighestByAuctionId(auction.getId());
                         if (highestBid == null) {
@@ -61,7 +61,7 @@ public class AuctionScheduledTask {
                         }
                     }
                     
-                    // 其他情况：只停止倒计时，不自动结束拍卖
+                    // 其他情况（包括第一阶段有出价、捡漏环节）：只停止倒计时，不自动结束拍卖
                     // 将endTime设置为当前时间，确保倒计时显示为0
                     // 但保持拍卖状态不变，等待管理员手动确认
                     if (auction.getEndTime() == null || auction.getEndTime().isAfter(now)) {
@@ -71,12 +71,12 @@ public class AuctionScheduledTask {
                     // 推送WebSocket消息，通知前端倒计时已结束，等待管理员确认
                     webSocketService.broadcastAuctionFinished(auction.getId());
                 } catch (Exception e) {
-                    // 记录错误但继续处理其他拍卖
+                    // 静默处理错误，继续处理其他拍卖
                     // 避免一个拍卖的错误影响其他拍卖的处理
                 }
             }
         } catch (Exception e) {
-            // 记录错误但不影响定时任务继续运行
+            // 静默处理错误，不影响定时任务继续运行
         }
     }
 }

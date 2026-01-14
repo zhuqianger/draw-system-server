@@ -15,7 +15,7 @@ mybatis:
   mapper-locations: classpath*:mapper/*.xml
   type-aliases-package: org.example.drawsystemserver.entity
   configuration:
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl  # 已禁用SQL语句打印
     map-underscore-to-camel-case: true
 server:
   port: 8080

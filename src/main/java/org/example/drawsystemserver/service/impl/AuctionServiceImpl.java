@@ -1,10 +1,12 @@
 package org.example.drawsystemserver.service.impl;
 
 import org.example.drawsystemserver.entity.Auction;
+import org.example.drawsystemserver.entity.AuctionPickRecord;
 import org.example.drawsystemserver.entity.Bid;
 import org.example.drawsystemserver.entity.Player;
 import org.example.drawsystemserver.entity.Team;
 import org.example.drawsystemserver.mapper.AuctionMapper;
+import org.example.drawsystemserver.mapper.AuctionPickRecordMapper;
 import org.example.drawsystemserver.mapper.BidMapper;
 import org.example.drawsystemserver.mapper.PlayerMapper;
 import org.example.drawsystemserver.mapper.TeamMapper;
@@ -31,6 +33,9 @@ public class AuctionServiceImpl implements AuctionService {
 
     @Autowired
     private TeamMapper teamMapper;
+
+    @Autowired
+    private AuctionPickRecordMapper auctionPickRecordMapper;
 
     /**
      * 创建拍卖（抽取后，等待管理员开始）
@@ -384,6 +389,18 @@ public class AuctionServiceImpl implements AuctionService {
                     }
                 }
             }
+
+            // 记录本次成功拍卖的选人纪录（无人拍到的不记录）
+            AuctionPickRecord record = new AuctionPickRecord();
+            record.setSessionId(auction.getSessionId());
+            record.setAuctionId(auction.getId());
+            record.setPlayerId(auction.getPlayerId());
+            record.setTeamId(highestBid.getTeamId());
+            record.setAmount(highestBid.getAmount());
+            Integer maxSeq = auctionPickRecordMapper.selectMaxSequenceBySessionId(auction.getSessionId());
+            int nextSeq = (maxSeq == null ? 1 : maxSeq + 1);
+            record.setSequence(nextSeq);
+            auctionPickRecordMapper.insert(record);
             
             // 有出价时，直接结束拍卖
             auction.setStatus("FINISHED");
@@ -425,5 +442,126 @@ public class AuctionServiceImpl implements AuctionService {
     @Override
     public List<Bid> getRecentBids(Long auctionId, int limit) {
         return bidMapper.selectRecentByAuctionId(auctionId, limit);
+    }
+
+    @Override
+    public List<AuctionPickRecord> getPickRecordsBySession(Long sessionId) {
+        return auctionPickRecordMapper.selectBySessionIdOrderBySequence(sessionId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void rollbackToPickRecord(Long recordId) {
+        AuctionPickRecord target = auctionPickRecordMapper.selectById(recordId);
+        if (target == null) {
+            throw new RuntimeException("选人纪录不存在，无法回退");
+        }
+        Long sessionId = target.getSessionId();
+        Integer targetSeq = target.getSequence();
+        if (targetSeq == null) {
+            throw new RuntimeException("选人纪录缺少顺序号，无法回退");
+        }
+
+        // 查询该流程下的全部选人纪录，按顺序区分需保留和需回退的部分
+        List<AuctionPickRecord> allRecords = auctionPickRecordMapper.selectBySessionIdOrderBySequence(sessionId);
+        if (allRecords == null || allRecords.isEmpty()) {
+            return;
+        }
+
+        java.util.List<AuctionPickRecord> keptRecords = new java.util.ArrayList<>();
+        java.util.List<AuctionPickRecord> revertedRecords = new java.util.ArrayList<>();
+        for (AuctionPickRecord r : allRecords) {
+            if (r.getSequence() != null && r.getSequence() < targetSeq) {
+                keptRecords.add(r);
+            } else if (r.getSequence() != null && r.getSequence() >= targetSeq) {
+                revertedRecords.add(r);
+            }
+        }
+
+        // 删除需要回退的选人纪录（从目标序号开始及之后的纪录全部删除）
+        auctionPickRecordMapper.deleteBySessionIdAndSequenceGte(sessionId, targetSeq);
+
+        // 获取该流程下的队伍与队员
+        List<Team> teams = teamMapper.selectBySessionId(sessionId);
+        List<Player> players = playerMapper.selectBySessionId(sessionId);
+
+        java.util.Map<Long, Team> teamMap = new java.util.HashMap<>();
+        java.util.Set<Long> captainPlayerIds = new java.util.HashSet<>();
+        for (Team team : teams) {
+            teamMap.put(team.getId(), team);
+            if (team.getCaptainId() != null) {
+                captainPlayerIds.add(team.getCaptainId());
+            }
+        }
+
+        // 构建：每个队伍保留的成交记录列表
+        java.util.Map<Long, java.util.List<AuctionPickRecord>> teamKeptRecords = new java.util.HashMap<>();
+        // 构建：每个队员是否仍然被保留的记录绑定（一个队员理论上只会被卖出一次）
+        java.util.Map<Long, AuctionPickRecord> playerKeptRecord = new java.util.HashMap<>();
+        for (AuctionPickRecord r : keptRecords) {
+            if (r.getTeamId() != null) {
+                teamKeptRecords.computeIfAbsent(r.getTeamId(), k -> new java.util.ArrayList<>()).add(r);
+            }
+            if (r.getPlayerId() != null) {
+                playerKeptRecord.put(r.getPlayerId(), r);
+            }
+        }
+
+        // 1）重算所有非队长队员的状态和归属
+        for (Player player : players) {
+            Long playerId = player.getId();
+            if (playerId == null) {
+                continue;
+            }
+            // 队长不参与回退（始终绑定在自己的队伍中）
+            if (captainPlayerIds.contains(playerId)) {
+                continue;
+            }
+
+            AuctionPickRecord kept = playerKeptRecord.get(playerId);
+            if (kept != null) {
+                // 仍然属于某个队伍
+                player.setStatus("SOLD");
+                player.setTeamId(kept.getTeamId());
+                player.setCurrentAuctionId(null);
+            } else {
+                // 不在任何保留记录中，退回待拍卖池
+                player.setStatus("POOL");
+                player.setTeamId(null);
+                player.setCurrentAuctionId(null);
+            }
+            playerMapper.update(player);
+        }
+
+        // 2）重算各队伍的 playerCount 与 nowCost
+        for (Team team : teams) {
+            java.util.List<AuctionPickRecord> list = teamKeptRecords.get(team.getId());
+            int newPlayerCount = (list == null ? 0 : list.size());
+
+            // 重新计算队伍的基础剩余费用：totalCost - 队长费用
+            java.math.BigDecimal totalCost = team.getTotalCost() != null ? team.getTotalCost() : new java.math.BigDecimal("18");
+            java.math.BigDecimal captainCost = java.math.BigDecimal.ZERO;
+            if (team.getCaptainId() != null) {
+                Player captainPlayer = playerMapper.selectById(team.getCaptainId());
+                if (captainPlayer != null && captainPlayer.getCost() != null) {
+                    captainCost = captainPlayer.getCost();
+                }
+            }
+            java.math.BigDecimal baseNowCost = totalCost.subtract(captainCost);
+
+            java.math.BigDecimal usedCost = java.math.BigDecimal.ZERO;
+            if (list != null) {
+                for (AuctionPickRecord r : list) {
+                    if (r.getAmount() != null) {
+                        usedCost = usedCost.add(r.getAmount());
+                    }
+                }
+            }
+            java.math.BigDecimal newNowCost = baseNowCost.subtract(usedCost);
+
+            team.setPlayerCount(newPlayerCount);
+            team.setNowCost(newNowCost);
+            teamMapper.update(team);
+        }
     }
 }

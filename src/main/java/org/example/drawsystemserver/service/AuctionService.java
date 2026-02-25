@@ -2,6 +2,7 @@ package org.example.drawsystemserver.service;
 
 import org.example.drawsystemserver.entity.Auction;
 import org.example.drawsystemserver.entity.Bid;
+import org.example.drawsystemserver.entity.AuctionPickRecord;
 
 import java.util.List;
 
@@ -20,4 +21,14 @@ public interface AuctionService {
     List<Bid> getRecentBids(Long auctionId, int limit);
     // 兼容旧接口
     Auction startAuction(Long sessionId, Long playerId, Integer durationSeconds);
+
+    /**
+     * 按流程获取全部选人纪录（仅包含拍卖成功的记录）。
+     */
+    List<AuctionPickRecord> getPickRecordsBySession(Long sessionId);
+
+    /**
+     * 根据选人纪录ID回退到该条纪录之前的状态（包含队伍费用与队员归属）。
+     */
+    void rollbackToPickRecord(Long recordId);
 }

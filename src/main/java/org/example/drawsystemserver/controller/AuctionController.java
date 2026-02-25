@@ -3,11 +3,14 @@ package org.example.drawsystemserver.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import org.example.drawsystemserver.dto.AuctionDTO;
 import org.example.drawsystemserver.dto.BidDTO;
+import org.example.drawsystemserver.dto.AuctionPickRecordDTO;
 import org.example.drawsystemserver.dto.ResponseDTO;
 import org.example.drawsystemserver.entity.Auction;
 import org.example.drawsystemserver.entity.Bid;
 import org.example.drawsystemserver.entity.Player;
 import org.example.drawsystemserver.entity.Team;
+import org.example.drawsystemserver.entity.AuctionPickRecord;
+import org.example.drawsystemserver.mapper.AuctionPickRecordMapper;
 import org.example.drawsystemserver.mapper.BidMapper;
 import org.example.drawsystemserver.mapper.PlayerMapper;
 import org.example.drawsystemserver.mapper.TeamMapper;
@@ -51,6 +54,9 @@ public class AuctionController {
 
     @Autowired
     private UserMapper userMapper;
+
+    @Autowired
+    private AuctionPickRecordMapper auctionPickRecordMapper;
 
     /**
      * 管理员抽取队员（创建拍卖，等待开始）
@@ -214,6 +220,66 @@ public class AuctionController {
                 .map(this::convertToBidDTO)
                 .collect(Collectors.toList());
         return ResponseDTO.success(dtos);
+    }
+
+    /**
+     * 获取某个流程下的所有选人纪录（只包含拍卖成功的队员）
+     */
+    @GetMapping("/picks")
+    public ResponseDTO<List<AuctionPickRecordDTO>> getPickRecords(@RequestParam Long sessionId) {
+        List<AuctionPickRecord> records = auctionService.getPickRecordsBySession(sessionId);
+        List<AuctionPickRecordDTO> dtos = records.stream().map(record -> {
+            AuctionPickRecordDTO dto = new AuctionPickRecordDTO();
+            dto.setId(record.getId());
+            dto.setSessionId(record.getSessionId());
+            dto.setAuctionId(record.getAuctionId());
+            dto.setPlayerId(record.getPlayerId());
+            dto.setTeamId(record.getTeamId());
+            dto.setAmount(record.getAmount());
+            dto.setSequence(record.getSequence());
+            dto.setCreateTime(record.getCreateTime());
+
+            Player player = playerMapper.selectById(record.getPlayerId());
+            if (player != null) {
+                dto.setPlayerGroupName(player.getGroupName());
+                dto.setPlayerGameId(player.getGameId());
+            }
+
+            Team team = teamMapper.selectById(record.getTeamId());
+            if (team != null) {
+                dto.setTeamName(team.getTeamName());
+                // 队长名称优先从 player 表的 groupName 取
+                Player captainPlayer = playerMapper.selectById(team.getCaptainId());
+                if (captainPlayer != null) {
+                    dto.setCaptainName(captainPlayer.getGroupName());
+                } else {
+                    dto.setCaptainName(team.getCaptainName());
+                }
+            }
+
+            return dto;
+        }).collect(Collectors.toList());
+        return ResponseDTO.success(dtos);
+    }
+
+    /**
+     * 管理员根据选人纪录回退到该条纪录之前的状态
+     */
+    @PostMapping("/rollback/{recordId}")
+    public ResponseDTO<String> rollbackToPickRecord(@PathVariable Long recordId, HttpServletRequest request) {
+        Long userId = (Long) request.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以进行回退操作");
+        }
+
+        try {
+            auctionService.rollbackToPickRecord(recordId);
+            // 回退会影响队伍信息、待拍卖池和当前拍卖，直接广播系统状态，让前端整体刷新
+            webSocketService.broadcastSystemStatus();
+            return ResponseDTO.success("已根据选人纪录回退到对应时刻之前的状态");
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
     }
 
     private AuctionDTO convertToDTO(Auction auction) {

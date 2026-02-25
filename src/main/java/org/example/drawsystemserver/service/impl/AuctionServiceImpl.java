@@ -478,25 +478,22 @@ public class AuctionServiceImpl implements AuctionService {
             }
         }
 
-        // 删除需要回退的选人纪录（从目标序号开始及之后的纪录全部删除）
+        // 删除需要回退的选人纪录（从目标节点开始及之后的所有纪录全部删除）
         auctionPickRecordMapper.deleteBySessionIdAndSequenceGte(sessionId, targetSeq);
 
         // 获取该流程下的队伍与队员
         List<Team> teams = teamMapper.selectBySessionId(sessionId);
         List<Player> players = playerMapper.selectBySessionId(sessionId);
 
-        java.util.Map<Long, Team> teamMap = new java.util.HashMap<>();
         java.util.Set<Long> captainPlayerIds = new java.util.HashSet<>();
         for (Team team : teams) {
-            teamMap.put(team.getId(), team);
             if (team.getCaptainId() != null) {
                 captainPlayerIds.add(team.getCaptainId());
             }
         }
 
-        // 构建：每个队伍保留的成交记录列表
+        // 构建：保留记录中每个队伍对应的成交列表、每个队员对应的保留记录
         java.util.Map<Long, java.util.List<AuctionPickRecord>> teamKeptRecords = new java.util.HashMap<>();
-        // 构建：每个队员是否仍然被保留的记录绑定（一个队员理论上只会被卖出一次）
         java.util.Map<Long, AuctionPickRecord> playerKeptRecord = new java.util.HashMap<>();
         for (AuctionPickRecord r : keptRecords) {
             if (r.getTeamId() != null) {
@@ -507,38 +504,40 @@ public class AuctionServiceImpl implements AuctionService {
             }
         }
 
-        // 1）重算所有非队长队员的状态和归属
+        // 1）同步队员归属：目标节点及之后的队员从队伍中移除、重新进入待拍卖池；保留记录中的队员留在对应队伍
         for (Player player : players) {
             Long playerId = player.getId();
-            if (playerId == null) {
-                continue;
-            }
-            // 队长不参与回退（始终绑定在自己的队伍中）
-            if (captainPlayerIds.contains(playerId)) {
-                continue;
-            }
+            if (playerId == null) continue;
+            if (captainPlayerIds.contains(playerId)) continue; // 队长不参与回退
 
             AuctionPickRecord kept = playerKeptRecord.get(playerId);
+            String newStatus;
+            Long newTeamId;
             if (kept != null) {
-                // 仍然属于某个队伍
                 player.setStatus("SOLD");
                 player.setTeamId(kept.getTeamId());
                 player.setCurrentAuctionId(null);
+                newStatus = "SOLD";
+                newTeamId = kept.getTeamId();
             } else {
-                // 不在任何保留记录中，退回待拍卖池
+                // 该节点及之后被选中的队员：从队伍中删除，放回待拍卖池
                 player.setStatus("POOL");
                 player.setTeamId(null);
                 player.setCurrentAuctionId(null);
+                newStatus = "POOL";
+                newTeamId = null;
             }
-            playerMapper.update(player);
+            // 注意：不能用通用 update，因为其中 teamId 的动态 SQL 不会在为 null 时更新列
+            playerMapper.updateStatus(playerId, newStatus);
+            playerMapper.updateTeamId(playerId, newTeamId);
+            playerMapper.updateCurrentAuctionId(playerId, null);
         }
 
-        // 2）重算各队伍的 playerCount 与 nowCost
+        // 2）同步队伍费用与成员数：按保留记录重算 nowCost，并按实际队员数同步 playerCount
         for (Team team : teams) {
             java.util.List<AuctionPickRecord> list = teamKeptRecords.get(team.getId());
             int newPlayerCount = (list == null ? 0 : list.size());
 
-            // 重新计算队伍的基础剩余费用：totalCost - 队长费用
             java.math.BigDecimal totalCost = team.getTotalCost() != null ? team.getTotalCost() : new java.math.BigDecimal("18");
             java.math.BigDecimal captainCost = java.math.BigDecimal.ZERO;
             if (team.getCaptainId() != null) {
@@ -552,16 +551,24 @@ public class AuctionServiceImpl implements AuctionService {
             java.math.BigDecimal usedCost = java.math.BigDecimal.ZERO;
             if (list != null) {
                 for (AuctionPickRecord r : list) {
-                    if (r.getAmount() != null) {
-                        usedCost = usedCost.add(r.getAmount());
-                    }
+                    if (r.getAmount() != null) usedCost = usedCost.add(r.getAmount());
                 }
             }
             java.math.BigDecimal newNowCost = baseNowCost.subtract(usedCost);
 
-            team.setPlayerCount(newPlayerCount);
             team.setNowCost(newNowCost);
+            team.setPlayerCount(newPlayerCount);
             teamMapper.update(team);
+        }
+
+        // 3）按数据库中的实际队员数再次同步 playerCount，确保与成员列表一致
+        for (Team team : teams) {
+            List<Player> actualMembers = playerMapper.selectByTeamIdExcludingCaptain(team.getId(), team.getCaptainId());
+            int actualCount = actualMembers != null ? actualMembers.size() : 0;
+            if (team.getPlayerCount() == null || team.getPlayerCount() != actualCount) {
+                team.setPlayerCount(actualCount);
+                teamMapper.update(team);
+            }
         }
     }
 }

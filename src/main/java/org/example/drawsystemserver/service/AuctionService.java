@@ -4,6 +4,7 @@ import org.example.drawsystemserver.entity.Auction;
 import org.example.drawsystemserver.entity.Bid;
 import org.example.drawsystemserver.entity.AuctionPickRecord;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface AuctionService {
@@ -31,4 +32,9 @@ public interface AuctionService {
      * 根据选人纪录ID回退到该条纪录之前的状态（包含队伍费用与队员归属）。
      */
     void rollbackToPickRecord(Long recordId);
+
+    /**
+     * 管理员从待拍卖池直接将队员以指定费用分配到某个队伍。
+     */
+    void assignPlayerDirect(Long playerId, Long teamId, BigDecimal amount);
 }

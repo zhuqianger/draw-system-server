@@ -4,11 +4,14 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.example.drawsystemserver.dto.PlayerDTO;
 import org.example.drawsystemserver.dto.ResponseDTO;
 import org.example.drawsystemserver.entity.Player;
+import org.example.drawsystemserver.service.AuctionService;
 import org.example.drawsystemserver.service.PlayerService;
 import org.example.drawsystemserver.service.UserService;
+import org.example.drawsystemserver.service.WebSocketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -98,5 +101,68 @@ public class PlayerController {
                 .collect(Collectors.toList());
 
         return ResponseDTO.success(dtos);
+    }
+
+    @Autowired
+    private AuctionService auctionService;
+
+    @Autowired
+    private WebSocketService webSocketService;
+
+    /**
+     * 管理员：从待拍卖池直接将队员分配到指定队伍
+     */
+    @PostMapping("/assign")
+    public ResponseDTO<String> assignPlayerToTeam(@RequestBody AssignPlayerRequest request, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以直接分配队员");
+        }
+
+        if (request == null || request.getPlayerId() == null || request.getTeamId() == null || request.getAmount() == null) {
+            return ResponseDTO.error("参数不完整");
+        }
+
+        try {
+            auctionService.assignPlayerDirect(request.getPlayerId(), request.getTeamId(), request.getAmount());
+            // 广播系统状态 & 队员分配
+            webSocketService.broadcastPlayerAssigned(request.getPlayerId(), request.getTeamId());
+            return ResponseDTO.success("分配成功");
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 直接分配队员时使用的请求体
+     */
+    public static class AssignPlayerRequest {
+        private Long playerId;
+        private Long teamId;
+        private BigDecimal amount;
+
+        public Long getPlayerId() {
+            return playerId;
+        }
+
+        public void setPlayerId(Long playerId) {
+            this.playerId = playerId;
+        }
+
+        public Long getTeamId() {
+            return teamId;
+        }
+
+        public void setTeamId(Long teamId) {
+            this.teamId = teamId;
+        }
+
+        public BigDecimal getAmount() {
+            return amount;
+        }
+
+        public void setAmount(BigDecimal amount) {
+            this.amount = amount;
+        }
     }
 }

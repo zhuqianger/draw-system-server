@@ -310,6 +310,96 @@ public class AuctionServiceImpl implements AuctionService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assignPlayerDirect(Long playerId, Long teamId, BigDecimal amount) {
+        if (amount == null) {
+            throw new RuntimeException("费用不能为空");
+        }
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("费用必须大于0");
+        }
+
+        Player player = playerMapper.selectById(playerId);
+        if (player == null) {
+            throw new RuntimeException("队员不存在");
+        }
+        if (!"POOL".equals(player.getStatus())) {
+            throw new RuntimeException("只有待拍卖池中的队员才能直接分配（当前状态：" + player.getStatus() + "）");
+        }
+
+        Team team = teamMapper.selectByIdForUpdate(teamId);
+        if (team == null) {
+            throw new RuntimeException("队伍不存在");
+        }
+
+        // 验证队伍与队员在同一拍卖流程
+        if (player.getSessionId() == null || team.getSessionId() == null ||
+                !player.getSessionId().equals(team.getSessionId())) {
+            throw new RuntimeException("队伍与队员不在同一拍卖流程，无法分配");
+        }
+
+        // 队伍未满员（最多4个队员，不含队长）
+        Integer currentCount = team.getPlayerCount() != null ? team.getPlayerCount() : 0;
+        if (currentCount >= 4) {
+            throw new RuntimeException("目标队伍已满员（最多4名队员）");
+        }
+
+        // 费用必须是0.5的倍数
+        BigDecimal half = new BigDecimal("0.5");
+        BigDecimal multiplied = amount.multiply(new BigDecimal("2"));
+        BigDecimal remainder = multiplied.remainder(BigDecimal.ONE);
+        if (remainder.compareTo(BigDecimal.ZERO) != 0) {
+            throw new RuntimeException("费用必须是0.5的倍数（当前金额：" + amount.toPlainString() + "）");
+        }
+
+        if (team.getNowCost() == null) {
+            throw new RuntimeException("队伍剩余费用未设置，无法分配队员");
+        }
+        // 不能超过队伍剩余费用（向下取整到0.5的倍数）
+        BigDecimal maxAllowed = team.getNowCost().divide(half, 0, java.math.RoundingMode.DOWN).multiply(half);
+        if (amount.compareTo(maxAllowed) > 0) {
+            throw new RuntimeException("分配费用不能超过队伍剩余费用（剩余：¥" + team.getNowCost().toPlainString()
+                    + "，最高可分配：¥" + maxAllowed.toPlainString() + "，当前：¥" + amount.toPlainString() + "）");
+        }
+
+        // 分配后剩余费用必须足够再补齐剩余空位（每个至少1）
+        int remainingSlots = 4 - currentCount;
+        BigDecimal remainingAfter = team.getNowCost().subtract(amount);
+        if (remainingSlots > 1 && remainingAfter.compareTo(new BigDecimal(remainingSlots - 1)) < 0) {
+            throw new RuntimeException("分配后剩余费用不足以补齐剩余队员（分配后剩余：¥" + remainingAfter.toPlainString()
+                    + "，还需：" + (remainingSlots - 1) + "名队员，每个至少¥1.00）");
+        }
+
+        // 更新队员：标记为 SOLD，归属该队伍
+        playerMapper.updateStatus(playerId, "SOLD");
+        playerMapper.updateTeamId(playerId, teamId);
+        playerMapper.updateCurrentAuctionId(playerId, null);
+
+        // 更新队伍：队员数+1，扣除费用
+        int pcResult = teamMapper.incrementPlayerCount(teamId);
+        if (pcResult == 0) {
+            throw new RuntimeException("更新队伍队员数量失败（teamId=" + teamId + "）");
+        }
+        int costResult = teamMapper.decreaseNowCost(teamId, amount);
+        if (costResult == 0) {
+            throw new RuntimeException("扣除队伍剩余费用失败（teamId=" + teamId + "，amount=" + amount.toPlainString()
+                    + "，当前剩余：" + team.getNowCost().toPlainString() + "）");
+        }
+
+        // 写入选人纪录（没有真实拍卖，auctionId 置为0，仅用于回退）
+        AuctionPickRecord record = new AuctionPickRecord();
+        record.setSessionId(team.getSessionId());
+        record.setAuctionId(0L);
+        record.setPlayerId(playerId);
+        record.setTeamId(teamId);
+        record.setAmount(amount);
+        Integer maxSeq = auctionPickRecordMapper.selectMaxSequenceBySessionId(team.getSessionId());
+        int nextSeq = (maxSeq == null ? 1 : maxSeq + 1);
+        record.setSequence(nextSeq);
+        auctionPickRecordMapper.insert(record);
+    }
+
+    @Override
     @Transactional
     public Auction finishAuction(Long auctionId) {
         // 默认是管理员手动结束

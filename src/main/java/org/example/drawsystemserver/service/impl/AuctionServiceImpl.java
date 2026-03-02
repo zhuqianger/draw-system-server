@@ -445,33 +445,34 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("该队员不在当前队伍中");
         }
 
-        // 计算该队员对应的费用（可能有多条纪录，通常只有一条）
+        // 删除该队员的选人纪录（如果存在）
         List<AuctionPickRecord> records = auctionPickRecordMapper.selectByTeamIdAndPlayerId(teamId, playerId);
-        BigDecimal removedAmount = BigDecimal.ZERO;
-        for (AuctionPickRecord r : records) {
-            if (r.getAmount() != null) {
-                removedAmount = removedAmount.add(r.getAmount());
-            }
-        }
-
-        // 删除该队员的选人纪录
         if (!records.isEmpty()) {
             auctionPickRecordMapper.deleteByTeamIdAndPlayerId(teamId, playerId);
         }
 
-        // 将队员放回待拍卖池
+        // 将队员放回待拍卖池（重置 teamId / currentAuctionId）
         playerMapper.updateStatus(playerId, "POOL");
         playerMapper.updateTeamId(playerId, null);
         playerMapper.updateCurrentAuctionId(playerId, null);
 
-        // 队伍剩余费用退还该队员费用，总费用保持不变
-        BigDecimal nowCost = team.getNowCost() != null ? team.getNowCost() : BigDecimal.ZERO;
-        team.setNowCost(nowCost.add(removedAmount));
-
-        Integer playerCount = team.getPlayerCount() != null ? team.getPlayerCount() : 0;
-        if (playerCount > 0) {
-            team.setPlayerCount(playerCount - 1);
+        // 重新根据选人纪录计算该队伍已用费用，并据此反推出最新剩余费用
+        BigDecimal usedCost = auctionPickRecordMapper.sumAmountByTeamId(teamId);
+        if (usedCost == null) {
+            usedCost = BigDecimal.ZERO;
         }
+        BigDecimal totalCost = team.getTotalCost() != null ? team.getTotalCost() : BigDecimal.ZERO;
+        BigDecimal newNowCost = totalCost.subtract(usedCost);
+        if (newNowCost.compareTo(BigDecimal.ZERO) < 0) {
+            newNowCost = BigDecimal.ZERO;
+        }
+        team.setNowCost(newNowCost);
+
+        // 同步队伍队员数量（不包括队长），防止累计误差
+        List<Player> actualMembers = playerMapper.selectByTeamIdExcludingCaptain(teamId, team.getCaptainId());
+        int actualCount = actualMembers != null ? actualMembers.size() : 0;
+        team.setPlayerCount(actualCount);
+
         teamMapper.update(team);
     }
 

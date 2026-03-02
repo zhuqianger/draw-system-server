@@ -703,39 +703,32 @@ public class AuctionServiceImpl implements AuctionService {
         // 2）同步队伍费用与成员数：按保留记录重算 nowCost，并按实际队员数同步 playerCount
         for (Team team : teams) {
             java.util.List<AuctionPickRecord> list = teamKeptRecords.get(team.getId());
-            int newPlayerCount = (list == null ? 0 : list.size());
 
-            java.math.BigDecimal totalCost = team.getTotalCost() != null ? team.getTotalCost() : new java.math.BigDecimal("18");
-            java.math.BigDecimal captainCost = java.math.BigDecimal.ZERO;
-            if (team.getCaptainId() != null) {
-                Player captainPlayer = playerMapper.selectById(team.getCaptainId());
-                if (captainPlayer != null && captainPlayer.getCost() != null) {
-                    captainCost = captainPlayer.getCost();
-                }
-            }
-            java.math.BigDecimal baseNowCost = totalCost.subtract(captainCost);
-
+            // 重新计算该队已用费用（仅根据选人纪录）
             java.math.BigDecimal usedCost = java.math.BigDecimal.ZERO;
             if (list != null) {
                 for (AuctionPickRecord r : list) {
-                    if (r.getAmount() != null) usedCost = usedCost.add(r.getAmount());
+                    if (r.getAmount() != null) {
+                        usedCost = usedCost.add(r.getAmount());
+                    }
                 }
             }
-            java.math.BigDecimal newNowCost = baseNowCost.subtract(usedCost);
 
+            java.math.BigDecimal totalCost = team.getTotalCost() != null
+                    ? team.getTotalCost()
+                    : java.math.BigDecimal.ZERO;
+            java.math.BigDecimal newNowCost = totalCost.subtract(usedCost);
+            if (newNowCost.compareTo(java.math.BigDecimal.ZERO) < 0) {
+                newNowCost = java.math.BigDecimal.ZERO;
+            }
             team.setNowCost(newNowCost);
-            team.setPlayerCount(newPlayerCount);
-            teamMapper.update(team);
-        }
 
-        // 3）按数据库中的实际队员数再次同步 playerCount，确保与成员列表一致
-        for (Team team : teams) {
+            // 按当前数据库中的实际队员数（不含队长）同步 playerCount
             List<Player> actualMembers = playerMapper.selectByTeamIdExcludingCaptain(team.getId(), team.getCaptainId());
             int actualCount = actualMembers != null ? actualMembers.size() : 0;
-            if (team.getPlayerCount() == null || team.getPlayerCount() != actualCount) {
-                team.setPlayerCount(actualCount);
-                teamMapper.update(team);
-            }
+            team.setPlayerCount(actualCount);
+
+            teamMapper.update(team);
         }
     }
 }

@@ -37,4 +37,16 @@ public interface AuctionService {
      * 管理员从待拍卖池直接将队员以指定费用分配到某个队伍。
      */
     void assignPlayerDirect(Long playerId, Long teamId, BigDecimal amount);
+
+    /**
+     * 管理员手动修改队伍当前剩余费用。
+     * 修改后会同步更新 totalCost = 新的剩余费用 + 该队伍已拍下队员的总费用。
+     */
+    void updateTeamCost(Long teamId, BigDecimal newNowCost);
+
+    /**
+     * 管理员从队伍中移除指定队员（非队长），并将其放回待拍卖池。
+     * 同时会退还该队员对应的拍卖费用到队伍剩余费用，并删除对应的选人纪录。
+     */
+    void removePlayerFromTeam(Long teamId, Long playerId);
 }

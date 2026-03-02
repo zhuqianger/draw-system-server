@@ -8,8 +8,10 @@ import org.example.drawsystemserver.dto.ResponseDTO;
 import org.example.drawsystemserver.dto.TeamDTO;
 import org.example.drawsystemserver.entity.*;
 import org.example.drawsystemserver.mapper.*;
+import org.example.drawsystemserver.service.AuctionService;
 import org.example.drawsystemserver.service.TeamService;
 import org.example.drawsystemserver.service.UserService;
+import org.example.drawsystemserver.service.WebSocketService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -44,6 +46,12 @@ public class TeamController {
     
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private AuctionService auctionService;
+
+    @Autowired
+    private WebSocketService webSocketService;
 
     /**
      * 获取所有队伍
@@ -255,6 +263,92 @@ public class TeamController {
             cell.setCellValue(0.0);
         }
         cell.setCellStyle(style);
+    }
+
+    /**
+     * 管理员手动修改队伍当前剩余费用
+     */
+    @PostMapping("/updateCost")
+    public ResponseDTO<String> updateTeamCost(@RequestBody UpdateTeamCostRequest request, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以修改队伍费用");
+        }
+        if (request == null || request.getTeamId() == null || request.getNowCost() == null) {
+            return ResponseDTO.error("参数不完整");
+        }
+
+        try {
+            auctionService.updateTeamCost(request.getTeamId(), request.getNowCost());
+            webSocketService.broadcastSystemStatus();
+            return ResponseDTO.success("队伍费用已更新");
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员将指定队员从队伍中移除并放回待拍卖池
+     */
+    @PostMapping("/removePlayer")
+    public ResponseDTO<String> removePlayerFromTeam(@RequestBody RemovePlayerRequest request, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以移除队员");
+        }
+        if (request == null || request.getTeamId() == null || request.getPlayerId() == null) {
+            return ResponseDTO.error("参数不完整");
+        }
+
+        try {
+            auctionService.removePlayerFromTeam(request.getTeamId(), request.getPlayerId());
+            webSocketService.broadcastSystemStatus();
+            return ResponseDTO.success("队员已移出队伍并回到待拍卖池");
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    public static class UpdateTeamCostRequest {
+        private Long teamId;
+        private BigDecimal nowCost;
+
+        public Long getTeamId() {
+            return teamId;
+        }
+
+        public void setTeamId(Long teamId) {
+            this.teamId = teamId;
+        }
+
+        public BigDecimal getNowCost() {
+            return nowCost;
+        }
+
+        public void setNowCost(BigDecimal nowCost) {
+            this.nowCost = nowCost;
+        }
+    }
+
+    public static class RemovePlayerRequest {
+        private Long teamId;
+        private Long playerId;
+
+        public Long getTeamId() {
+            return teamId;
+        }
+
+        public void setTeamId(Long teamId) {
+            this.teamId = teamId;
+        }
+
+        public Long getPlayerId() {
+            return playerId;
+        }
+
+        public void setPlayerId(Long playerId) {
+            this.playerId = playerId;
+        }
     }
 
     private TeamDTO convertToDTO(Team team) {

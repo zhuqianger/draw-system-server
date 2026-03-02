@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.example.drawsystemserver.entity.AuctionPickRecord;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Mapper
@@ -32,5 +33,22 @@ public interface AuctionPickRecordMapper {
                                         @Param("sequence") Integer sequence);
 
     int deleteBySessionId(Long sessionId);
+
+    /**
+     * 统计某个队伍已拍下队员的总费用。
+     */
+    BigDecimal sumAmountByTeamId(Long teamId);
+
+    /**
+     * 查询某队伍下某个队员的选人纪录（通常只有一条）。
+     */
+    List<AuctionPickRecord> selectByTeamIdAndPlayerId(@Param("teamId") Long teamId,
+                                                      @Param("playerId") Long playerId);
+
+    /**
+     * 删除某队伍下某个队员的所有选人纪录。
+     */
+    int deleteByTeamIdAndPlayerId(@Param("teamId") Long teamId,
+                                  @Param("playerId") Long playerId);
 }
 

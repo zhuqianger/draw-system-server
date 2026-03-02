@@ -400,6 +400,82 @@ public class AuctionServiceImpl implements AuctionService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateTeamCost(Long teamId, BigDecimal newNowCost) {
+        if (newNowCost == null) {
+            throw new RuntimeException("剩余费用不能为空");
+        }
+        if (newNowCost.compareTo(BigDecimal.ZERO) < 0) {
+            throw new RuntimeException("剩余费用不能为负数");
+        }
+
+        Team team = teamMapper.selectByIdForUpdate(teamId);
+        if (team == null) {
+            throw new RuntimeException("队伍不存在");
+        }
+
+        // 已拍下队员的总费用来自选人纪录
+        BigDecimal usedCost = auctionPickRecordMapper.sumAmountByTeamId(teamId);
+        if (usedCost == null) {
+            usedCost = BigDecimal.ZERO;
+        }
+
+        BigDecimal totalCost = newNowCost.add(usedCost);
+        team.setNowCost(newNowCost);
+        team.setTotalCost(totalCost);
+        teamMapper.update(team);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removePlayerFromTeam(Long teamId, Long playerId) {
+        Team team = teamMapper.selectByIdForUpdate(teamId);
+        if (team == null) {
+            throw new RuntimeException("队伍不存在");
+        }
+
+        Player player = playerMapper.selectById(playerId);
+        if (player == null) {
+            throw new RuntimeException("队员不存在");
+        }
+        if (team.getCaptainId() != null && team.getCaptainId().equals(playerId)) {
+            throw new RuntimeException("不能移除队长");
+        }
+        if (player.getTeamId() == null || !player.getTeamId().equals(teamId)) {
+            throw new RuntimeException("该队员不在当前队伍中");
+        }
+
+        // 计算该队员对应的费用（可能有多条纪录，通常只有一条）
+        List<AuctionPickRecord> records = auctionPickRecordMapper.selectByTeamIdAndPlayerId(teamId, playerId);
+        BigDecimal removedAmount = BigDecimal.ZERO;
+        for (AuctionPickRecord r : records) {
+            if (r.getAmount() != null) {
+                removedAmount = removedAmount.add(r.getAmount());
+            }
+        }
+
+        // 删除该队员的选人纪录
+        if (!records.isEmpty()) {
+            auctionPickRecordMapper.deleteByTeamIdAndPlayerId(teamId, playerId);
+        }
+
+        // 将队员放回待拍卖池
+        playerMapper.updateStatus(playerId, "POOL");
+        playerMapper.updateTeamId(playerId, null);
+        playerMapper.updateCurrentAuctionId(playerId, null);
+
+        // 队伍剩余费用退还该队员费用，总费用保持不变
+        BigDecimal nowCost = team.getNowCost() != null ? team.getNowCost() : BigDecimal.ZERO;
+        team.setNowCost(nowCost.add(removedAmount));
+
+        Integer playerCount = team.getPlayerCount() != null ? team.getPlayerCount() : 0;
+        if (playerCount > 0) {
+            team.setPlayerCount(playerCount - 1);
+        }
+        teamMapper.update(team);
+    }
+
+    @Override
     @Transactional
     public Auction finishAuction(Long auctionId) {
         // 默认是管理员手动结束

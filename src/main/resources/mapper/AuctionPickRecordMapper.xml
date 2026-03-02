@@ -64,5 +64,25 @@
         DELETE FROM auction_pick_record WHERE sessionId = #{sessionId}
     </delete>
 
+    <select id="sumAmountByTeamId" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(amount), 0)
+        FROM auction_pick_record
+        WHERE teamId = #{teamId}
+    </select>
+
+    <select id="selectByTeamIdAndPlayerId" resultMap="BaseResultMap">
+        SELECT *
+        FROM auction_pick_record
+        WHERE teamId = #{teamId}
+          AND playerId = #{playerId}
+        ORDER BY sequence ASC, id ASC
+    </select>
+
+    <delete id="deleteByTeamIdAndPlayerId">
+        DELETE FROM auction_pick_record
+        WHERE teamId = #{teamId}
+          AND playerId = #{playerId}
+    </delete>
+
 </mapper>
 

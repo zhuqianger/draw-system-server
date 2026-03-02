@@ -420,7 +420,17 @@ public class AuctionServiceImpl implements AuctionService {
             usedCost = BigDecimal.ZERO;
         }
 
-        BigDecimal totalCost = newNowCost.add(usedCost);
+        // 队长费用来自 player 表
+        BigDecimal captainCost = BigDecimal.ZERO;
+        if (team.getCaptainId() != null) {
+            Player captain = playerMapper.selectById(team.getCaptainId());
+            if (captain != null && captain.getCost() != null) {
+                captainCost = captain.getCost();
+            }
+        }
+
+        // 总费用 = 队长费用 + 已花费用 + 剩余费用
+        BigDecimal totalCost = newNowCost.add(usedCost).add(captainCost);
         team.setNowCost(newNowCost);
         team.setTotalCost(totalCost);
         teamMapper.update(team);
@@ -462,7 +472,18 @@ public class AuctionServiceImpl implements AuctionService {
             usedCost = BigDecimal.ZERO;
         }
         BigDecimal totalCost = team.getTotalCost() != null ? team.getTotalCost() : BigDecimal.ZERO;
-        BigDecimal newNowCost = totalCost.subtract(usedCost);
+
+        // 队长费用
+        BigDecimal captainCost = BigDecimal.ZERO;
+        if (team.getCaptainId() != null) {
+            Player captain = playerMapper.selectById(team.getCaptainId());
+            if (captain != null && captain.getCost() != null) {
+                captainCost = captain.getCost();
+            }
+        }
+
+        // 剩余费用 = 总费用 - 队长费用 - 已花费用
+        BigDecimal newNowCost = totalCost.subtract(captainCost).subtract(usedCost);
         if (newNowCost.compareTo(BigDecimal.ZERO) < 0) {
             newNowCost = BigDecimal.ZERO;
         }
@@ -717,7 +738,18 @@ public class AuctionServiceImpl implements AuctionService {
             java.math.BigDecimal totalCost = team.getTotalCost() != null
                     ? team.getTotalCost()
                     : java.math.BigDecimal.ZERO;
-            java.math.BigDecimal newNowCost = totalCost.subtract(usedCost);
+
+            // 队长费用
+            java.math.BigDecimal captainCost = java.math.BigDecimal.ZERO;
+            if (team.getCaptainId() != null) {
+                Player captainPlayer = playerMapper.selectById(team.getCaptainId());
+                if (captainPlayer != null && captainPlayer.getCost() != null) {
+                    captainCost = captainPlayer.getCost();
+                }
+            }
+
+            // 剩余费用 = 总费用 - 队长费用 - 已花费用
+            java.math.BigDecimal newNowCost = totalCost.subtract(captainCost).subtract(usedCost);
             if (newNowCost.compareTo(java.math.BigDecimal.ZERO) < 0) {
                 newNowCost = java.math.BigDecimal.ZERO;
             }

@@ -3,10 +3,12 @@ package org.example.drawsystemserver.service;
 import org.example.drawsystemserver.entity.AuctionSession;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface AuctionSessionService {
-    AuctionSession createSession(String sessionName, MultipartFile excelFile, List<Integer> captainIndices, Long adminId) throws Exception;
+    AuctionSession createSession(String sessionName, MultipartFile excelFile, List<Integer> captainIndices,
+                                 Long adminId, BigDecimal initialTotalCost) throws Exception;
     List<AuctionSession> getAllSessions();
     AuctionSession getSessionById(Long sessionId);
     AuctionSession activateSession(Long sessionId);

@@ -45,7 +45,8 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public AuctionSession createSession(String sessionName, MultipartFile excelFile, List<Integer> captainIndices, Long adminId) throws Exception {
+    public AuctionSession createSession(String sessionName, MultipartFile excelFile, List<Integer> captainIndices,
+                                        Long adminId, BigDecimal initialTotalCost) throws Exception {
         // 先保存Excel文件（避免多次读取MultipartFile的InputStream）
         String filePath = excelService.saveFile(excelFile);
         
@@ -68,7 +69,7 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                 playerMapper.insert(player);
             }
             
-            // 计算所有队员费用的平均值（用于计算nowCost，但totalCost固定为18）
+            // 计算所有队员费用的平均值（用于计算默认的队伍总费用）
             List<BigDecimal> validCosts = players.stream()
                 .filter(p -> p.getCost() != null)
                 .map(Player::getCost)
@@ -84,8 +85,13 @@ public class AuctionSessionServiceImpl implements AuctionSessionService {
                     .divide(new BigDecimal(validCosts.size()), 2, RoundingMode.HALF_UP);
             }
             
-            // 队伍总费用固定为18（包括队长和4个队员的费用总和）
-            BigDecimal totalCost = new BigDecimal("18");
+            // 队伍总费用：如果有传入初始值则使用传入值，否则 = 所有队员平均费用 + 2
+            BigDecimal totalCost;
+            if (initialTotalCost != null && initialTotalCost.compareTo(BigDecimal.ZERO) > 0) {
+                totalCost = initialTotalCost.setScale(2, RoundingMode.HALF_UP);
+            } else {
+                totalCost = averageCost.add(new BigDecimal("2")).setScale(2, RoundingMode.HALF_UP);
+            }
             
             // 获取该session下所有已插入的player（用于查找队长player）
             List<Player> allPlayers = playerMapper.selectBySessionId(session.getId());

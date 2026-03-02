@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -32,6 +33,7 @@ public class AuctionSessionController {
             @RequestParam String sessionName,
             @RequestParam MultipartFile excelFile,
             @RequestParam String captainIndices, // 逗号分隔的队长序号，如 "1,2,3"
+            @RequestParam(required = false) BigDecimal initialTotalCost, // 每队初始总费用（可选）
             HttpServletRequest request) {
         Long userId = (Long) request.getAttribute("userId");
         if (!userService.isAdmin(userId)) {
@@ -45,7 +47,7 @@ public class AuctionSessionController {
                     .map(Integer::parseInt)
                     .collect(Collectors.toList());
 
-            AuctionSession session = sessionService.createSession(sessionName, excelFile, indices, userId);
+            AuctionSession session = sessionService.createSession(sessionName, excelFile, indices, userId, initialTotalCost);
             return ResponseDTO.success("拍卖流程创建成功", session);
         } catch (Exception e) {
             return ResponseDTO.error("创建失败：" + e.getMessage());

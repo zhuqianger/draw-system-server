@@ -38,6 +38,51 @@ public class AuctionServiceImpl implements AuctionService {
     private AuctionPickRecordMapper auctionPickRecordMapper;
 
     /**
+     * 根据当前队伍的 totalCost、队长费用以及选人纪录，重新计算队伍的
+     * 剩余费用(nowCost) 和 队员数量(playerCount)。
+     * 公式：
+     *   nowCost = totalCost - captainCost - sum(pickRecord.amount for this team)
+     */
+    private void recalcTeamCost(Long teamId) {
+        if (teamId == null) {
+            return;
+        }
+        Team team = teamMapper.selectByIdForUpdate(teamId);
+        if (team == null) {
+            return;
+        }
+
+        // 统计该队已拍下队员的总费用
+        BigDecimal usedCost = auctionPickRecordMapper.sumAmountByTeamId(teamId);
+        if (usedCost == null) {
+            usedCost = BigDecimal.ZERO;
+        }
+
+        // 队长费用
+        BigDecimal captainCost = BigDecimal.ZERO;
+        if (team.getCaptainId() != null) {
+            Player captain = playerMapper.selectById(team.getCaptainId());
+            if (captain != null && captain.getCost() != null) {
+                captainCost = captain.getCost();
+            }
+        }
+
+        BigDecimal totalCost = team.getTotalCost() != null ? team.getTotalCost() : BigDecimal.ZERO;
+        BigDecimal nowCost = totalCost.subtract(captainCost).subtract(usedCost);
+        if (nowCost.compareTo(BigDecimal.ZERO) < 0) {
+            nowCost = BigDecimal.ZERO;
+        }
+        team.setNowCost(nowCost);
+
+        // 按当前数据库中的实际队员数（不含队长）同步 playerCount
+        List<Player> actualMembers = playerMapper.selectByTeamIdExcludingCaptain(teamId, team.getCaptainId());
+        int actualCount = actualMembers != null ? actualMembers.size() : 0;
+        team.setPlayerCount(actualCount);
+
+        teamMapper.update(team);
+    }
+
+    /**
      * 创建拍卖（抽取后，等待管理员开始）
      */
     @Override
@@ -375,17 +420,6 @@ public class AuctionServiceImpl implements AuctionService {
         playerMapper.updateTeamId(playerId, teamId);
         playerMapper.updateCurrentAuctionId(playerId, null);
 
-        // 更新队伍：队员数+1，扣除费用
-        int pcResult = teamMapper.incrementPlayerCount(teamId);
-        if (pcResult == 0) {
-            throw new RuntimeException("更新队伍队员数量失败（teamId=" + teamId + "）");
-        }
-        int costResult = teamMapper.decreaseNowCost(teamId, amount);
-        if (costResult == 0) {
-            throw new RuntimeException("扣除队伍剩余费用失败（teamId=" + teamId + "，amount=" + amount.toPlainString()
-                    + "，当前剩余：" + team.getNowCost().toPlainString() + "）");
-        }
-
         // 写入选人纪录（没有真实拍卖，auctionId 置为0，仅用于回退）
         AuctionPickRecord record = new AuctionPickRecord();
         record.setSessionId(team.getSessionId());
@@ -397,6 +431,9 @@ public class AuctionServiceImpl implements AuctionService {
         int nextSeq = (maxSeq == null ? 1 : maxSeq + 1);
         record.setSequence(nextSeq);
         auctionPickRecordMapper.insert(record);
+
+        // 统一重算该队伍的剩余费用与队员数量
+        recalcTeamCost(teamId);
     }
 
     @Override
@@ -543,39 +580,8 @@ public class AuctionServiceImpl implements AuctionService {
                 player.setCurrentAuctionId(null);
                 playerMapper.update(player);
                 
-                // 增加队伍队员数量
-                int playerCountResult = teamMapper.incrementPlayerCount(highestBid.getTeamId());
-                if (playerCountResult == 0) {
-                    throw new RuntimeException("更新队伍队员数量失败（teamId=" + highestBid.getTeamId() + "）");
-                }
-                
-                // 减少队伍剩余费用（减去获胜出价）
-                // 使用SELECT FOR UPDATE锁定行，防止并发问题
-                Team currentTeam = teamMapper.selectByIdForUpdate(highestBid.getTeamId());
-                if (currentTeam == null) {
-                    throw new RuntimeException("队伍不存在（teamId=" + highestBid.getTeamId() + "）");
-                }
-                if (currentTeam.getNowCost() == null) {
-                    throw new RuntimeException("队伍剩余费用未设置（teamId=" + highestBid.getTeamId() + "）");
-                }
-                if (currentTeam.getNowCost().compareTo(highestBid.getAmount()) < 0) {
-                    throw new RuntimeException("队伍剩余费用不足（剩余：" + currentTeam.getNowCost().toPlainString() + "，需要扣除：" + highestBid.getAmount().toPlainString() + "）");
-                }
-                
-                // 使用原子操作扣除费用
-                int costResult = teamMapper.decreaseNowCost(highestBid.getTeamId(), highestBid.getAmount());
-                if (costResult == 0) {
-                    throw new RuntimeException("扣除队伍剩余费用失败（teamId=" + highestBid.getTeamId() + "，amount=" + highestBid.getAmount().toPlainString() + "，当前剩余：" + currentTeam.getNowCost().toPlainString() + "）");
-                }
-                
-                // 验证扣除后的费用（可选，用于调试）
-                Team updatedTeam = teamMapper.selectById(highestBid.getTeamId());
-                if (updatedTeam != null && updatedTeam.getNowCost() != null) {
-                    BigDecimal expectedCost = currentTeam.getNowCost().subtract(highestBid.getAmount());
-                    if (updatedTeam.getNowCost().compareTo(expectedCost) != 0) {
-                        throw new RuntimeException("扣除费用后数据不一致（期望：" + expectedCost.toPlainString() + "，实际：" + updatedTeam.getNowCost().toPlainString() + "）");
-                    }
-                }
+                // 不再在这里手动维护队伍的 playerCount / nowCost，
+                // 统一在插入选人纪录后通过 recalcTeamCost 进行重算，避免多路径导致的数据不一致。
             }
 
             // 记录本次成功拍卖的选人纪录（无人拍到的不记录）
@@ -589,6 +595,9 @@ public class AuctionServiceImpl implements AuctionService {
             int nextSeq = (maxSeq == null ? 1 : maxSeq + 1);
             record.setSequence(nextSeq);
             auctionPickRecordMapper.insert(record);
+            
+            // 统一根据 totalCost / 队长费用 / 所有选人纪录重算该队伍的剩余费用与队员数量
+            recalcTeamCost(highestBid.getTeamId());
             
             // 有出价时，直接结束拍卖
             auction.setStatus("FINISHED");

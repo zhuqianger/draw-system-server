@@ -36,6 +36,9 @@ public class PlayerController {
                 .map(p -> {
                     PlayerDTO dto = new PlayerDTO();
                     dto.setId(p.getId());
+                    dto.setGroupId(p.getGroupId());
+                    dto.setPoolType(p.getPoolType());
+                    dto.setFailedOrder(p.getFailedOrder());
                     dto.setGroupName(p.getGroupName());
                     dto.setGameId(p.getGameId());
                     dto.setPosition(p.getPosition());
@@ -65,6 +68,9 @@ public class PlayerController {
                 .map(p -> {
                     PlayerDTO dto = new PlayerDTO();
                     dto.setId(p.getId());
+                    dto.setGroupId(p.getGroupId());
+                    dto.setPoolType(p.getPoolType());
+                    dto.setFailedOrder(p.getFailedOrder());
                     dto.setGroupName(p.getGroupName());
                     dto.setGameId(p.getGameId());
                     dto.setPosition(p.getPosition());
@@ -89,6 +95,9 @@ public class PlayerController {
                 .map(p -> {
                     PlayerDTO dto = new PlayerDTO();
                     dto.setId(p.getId());
+                    dto.setGroupId(p.getGroupId());
+                    dto.setPoolType(p.getPoolType());
+                    dto.setFailedOrder(p.getFailedOrder());
                     dto.setGroupName(p.getGroupName());
                     dto.setGameId(p.getGameId());
                     dto.setPosition(p.getPosition());
@@ -130,6 +139,58 @@ public class PlayerController {
             return ResponseDTO.success("分配成功");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 管理员：将待拍卖池队员在普通池与流拍池之间调整
+     */
+    @PostMapping("/pool/change")
+    public ResponseDTO<String> changePlayerPool(@RequestBody ChangePlayerPoolRequest request, HttpServletRequest httpRequest) {
+        Long userId = (Long) httpRequest.getAttribute("userId");
+        if (!userService.isAdmin(userId)) {
+            return ResponseDTO.error(403, "只有管理员可以调整队员池");
+        }
+        if (request == null || request.getSessionId() == null || request.getPlayerId() == null
+                || request.getTargetPoolType() == null) {
+            return ResponseDTO.error("参数不完整");
+        }
+        try {
+            playerService.changePlayerPool(request.getSessionId(), request.getPlayerId(), request.getTargetPoolType());
+            webSocketService.broadcastSystemStatus();
+            return ResponseDTO.success("已更新队员所属池");
+        } catch (Exception e) {
+            return ResponseDTO.error(e.getMessage());
+        }
+    }
+
+    public static class ChangePlayerPoolRequest {
+        private Long sessionId;
+        private Long playerId;
+        private String targetPoolType;
+
+        public Long getSessionId() {
+            return sessionId;
+        }
+
+        public void setSessionId(Long sessionId) {
+            this.sessionId = sessionId;
+        }
+
+        public Long getPlayerId() {
+            return playerId;
+        }
+
+        public void setPlayerId(Long playerId) {
+            this.playerId = playerId;
+        }
+
+        public String getTargetPoolType() {
+            return targetPoolType;
+        }
+
+        public void setTargetPoolType(String targetPoolType) {
+            this.targetPoolType = targetPoolType;
         }
     }
 

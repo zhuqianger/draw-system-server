@@ -13,6 +13,8 @@
         <result column="rank" property="rank"/>
         <result column="cost" property="cost"/>
         <result column="status" property="status"/>
+        <result column="poolType" property="poolType"/>
+        <result column="failedOrder" property="failedOrder"/>
         <result column="currentAuctionId" property="currentAuctionId"/>
         <result column="teamId" property="teamId"/>
         <result column="createTime" property="createTime"/>
@@ -48,8 +50,9 @@
     </select>
 
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO player (sessionId, groupId, groupName, gameId, position, heroes, `rank`, cost, status)
-        VALUES (#{sessionId}, #{groupId}, #{groupName}, #{gameId}, #{position}, #{heroes}, #{rank}, #{cost}, #{status})
+        INSERT INTO player (sessionId, groupId, groupName, gameId, position, heroes, `rank`, cost, status, poolType, failedOrder)
+        VALUES (#{sessionId}, #{groupId}, #{groupName}, #{gameId}, #{position}, #{heroes}, #{rank}, #{cost}, #{status},
+                IFNULL(#{poolType}, 'NORMAL'), #{failedOrder})
     </insert>
 
     <update id="update">
@@ -63,6 +66,8 @@
             <if test="rank != null">`rank` = #{rank},</if>
             <if test="cost != null">cost = #{cost},</if>
             <if test="status != null">status = #{status},</if>
+            <if test="poolType != null">poolType = #{poolType},</if>
+            <if test="failedOrder != null">failedOrder = #{failedOrder},</if>
             <if test="currentAuctionId != null">currentAuctionId = #{currentAuctionId},</if>
             <if test="teamId != null">teamId = #{teamId},</if>
         </set>
@@ -84,5 +89,20 @@
     <delete id="deleteBySessionId">
         DELETE FROM player WHERE sessionId = #{sessionId}
     </delete>
+
+    <select id="countPoolNormalBySession" resultType="int">
+        SELECT COUNT(*) FROM player
+        WHERE sessionId = #{sessionId} AND status = 'POOL'
+          AND (poolType IS NULL OR poolType = '' OR poolType = 'NORMAL')
+    </select>
+
+    <select id="selectMaxFailedOrderBySession" resultType="java.lang.Integer">
+        SELECT MAX(failedOrder) FROM player
+        WHERE sessionId = #{sessionId} AND status = 'POOL' AND poolType = 'FAILED'
+    </select>
+
+    <update id="updatePoolTypeAndFailedOrder">
+        UPDATE player SET poolType = #{poolType}, failedOrder = #{failedOrder,jdbcType=INTEGER} WHERE id = #{id}
+    </update>
 
 </mapper>

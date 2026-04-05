@@ -1,12 +1,16 @@
 package org.example.drawsystemserver.service.impl;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.drawsystemserver.entity.Auction;
 import org.example.drawsystemserver.entity.AuctionPickRecord;
+import org.example.drawsystemserver.entity.AuctionSession;
 import org.example.drawsystemserver.entity.Bid;
 import org.example.drawsystemserver.entity.Player;
 import org.example.drawsystemserver.entity.Team;
 import org.example.drawsystemserver.mapper.AuctionMapper;
 import org.example.drawsystemserver.mapper.AuctionPickRecordMapper;
+import org.example.drawsystemserver.mapper.AuctionSessionMapper;
 import org.example.drawsystemserver.mapper.BidMapper;
 import org.example.drawsystemserver.mapper.PlayerMapper;
 import org.example.drawsystemserver.mapper.TeamMapper;
@@ -36,6 +40,11 @@ public class AuctionServiceImpl implements AuctionService {
 
     @Autowired
     private AuctionPickRecordMapper auctionPickRecordMapper;
+
+    @Autowired
+    private AuctionSessionMapper auctionSessionMapper;
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 根据当前队伍的 totalCost、队长费用以及选人纪录，重新计算队伍的
@@ -97,6 +106,32 @@ public class AuctionServiceImpl implements AuctionService {
         Player player = playerMapper.selectById(playerId);
         if (player == null || !"POOL".equals(player.getStatus())) {
             throw new RuntimeException("队员不存在或不在待拍卖池中");
+        }
+        if (!sessionId.equals(player.getSessionId())) {
+            throw new RuntimeException("队员不属于当前拍卖流程");
+        }
+
+        AuctionSession session = auctionSessionMapper.selectById(sessionId);
+        if (session != null && session.getCaptainIds() != null && player.getGroupId() != null) {
+            try {
+                List<Integer> captainIndices = objectMapper.readValue(
+                        session.getCaptainIds(),
+                        new TypeReference<List<Integer>>() {});
+                if (captainIndices != null && captainIndices.contains(player.getGroupId())) {
+                    throw new RuntimeException("不能抽取队长");
+                }
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException("解析队长信息失败，无法校验是否队长", e);
+            }
+        }
+
+        if ("FAILED".equals(player.getPoolType())) {
+            int normalLeft = playerMapper.countPoolNormalBySession(sessionId);
+            if (normalLeft > 0) {
+                throw new RuntimeException("仍有普通池队员，请先拍完普通池后再抽取流拍池");
+            }
         }
 
         // 计算费用梯度和起拍价
@@ -611,12 +646,22 @@ public class AuctionServiceImpl implements AuctionService {
                 // 自动结束且是第一阶段，检查是否有出价，如果没有则进入捡漏环节
                 return enterPickupPhase(auctionId);
             } else {
-                // 管理员手动结束，或者捡漏环节自动结束，直接结束拍卖，将队员放回待拍卖池
+                // 管理员手动结束，或者捡漏环节倒计时结束后由管理员确认：无出价则流拍
                 Player player = playerMapper.selectById(auction.getPlayerId());
                 if (player != null) {
-                    player.setStatus("POOL");
-                    player.setCurrentAuctionId(null);
-                    playerMapper.update(player);
+                    if ("WAITING".equals(auction.getStatus())) {
+                        // 尚未开始拍卖，仅撤销本次抽取，不改变池类型与流拍顺序
+                        player.setStatus("POOL");
+                        player.setCurrentAuctionId(null);
+                        playerMapper.update(player);
+                    } else {
+                        // 已进行第一阶段或捡漏仍无人出价：进入流拍池队尾（普通池首次流拍进流拍池；流拍池再次流拍排到队尾）
+                        Integer maxFo = playerMapper.selectMaxFailedOrderBySession(auction.getSessionId());
+                        int nextOrder = (maxFo == null ? 1 : maxFo + 1);
+                        playerMapper.updateStatus(player.getId(), "POOL");
+                        playerMapper.updateCurrentAuctionId(player.getId(), null);
+                        playerMapper.updatePoolTypeAndFailedOrder(player.getId(), "FAILED", nextOrder);
+                    }
                 }
                 auction.setStatus("FINISHED");
                 auction.setPhase(null);

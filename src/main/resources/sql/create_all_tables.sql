@@ -38,6 +38,8 @@ CREATE TABLE IF NOT EXISTS `player` (
     `rank` VARCHAR(20) COMMENT '段位',
     `cost` DECIMAL(10,2) COMMENT '费用',
     `status` VARCHAR(20) NOT NULL DEFAULT 'POOL' COMMENT '状态：POOL-待拍卖池，AUCTIONING-拍卖中，SOLD-已售出',
+    `poolType` VARCHAR(20) NOT NULL DEFAULT 'NORMAL' COMMENT '池类型：NORMAL-普通池, FAILED-流拍池',
+    `failedOrder` INT NULL DEFAULT NULL COMMENT '流拍池顺序（越小越靠前）',
     `currentAuctionId` BIGINT NULL COMMENT '当前拍卖ID，如果正在拍卖中',
     `teamId` BIGINT NULL COMMENT '所属队伍ID，如果已售出',
     `createTime` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -45,6 +47,8 @@ CREATE TABLE IF NOT EXISTS `player` (
     PRIMARY KEY (`id`),
     KEY `idx_sessionId` (`sessionId`),
     KEY `idx_status` (`status`),
+    KEY `idx_session_status_poolType` (`sessionId`, `status`, `poolType`),
+    KEY `idx_session_failedOrder` (`sessionId`, `failedOrder`),
     KEY `idx_teamId` (`teamId`),
     KEY `idx_currentAuctionId` (`currentAuctionId`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='队员表';

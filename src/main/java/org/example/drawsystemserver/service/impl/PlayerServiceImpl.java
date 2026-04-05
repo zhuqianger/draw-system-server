@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -54,8 +55,57 @@ public class PlayerServiceImpl implements PlayerService {
                 e.printStackTrace();
             }
         }
+
+        poolPlayers.sort(Comparator
+                .comparing((Player p) -> isNormalPool(p) ? 0 : 1)
+                .thenComparing(p -> isNormalPool(p)
+                        ? p.getGroupId() == null ? Integer.MAX_VALUE : p.getGroupId()
+                        : p.getFailedOrder() == null ? Integer.MAX_VALUE : p.getFailedOrder()));
         
         return poolPlayers;
+    }
+
+    private static boolean isNormalPool(Player p) {
+        String t = p.getPoolType();
+        return t == null || t.isEmpty() || "NORMAL".equals(t);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void changePlayerPool(Long sessionId, Long playerId, String targetPoolType) {
+        Player player = playerMapper.selectById(playerId);
+        if (player == null || !sessionId.equals(player.getSessionId())) {
+            throw new RuntimeException("队员不存在或不属于该流程");
+        }
+        if (!"POOL".equals(player.getStatus())) {
+            throw new RuntimeException("仅在待拍卖池中的队员可调整池类型");
+        }
+
+        AuctionSession session = sessionMapper.selectById(sessionId);
+        if (session != null && session.getCaptainIds() != null && player.getGroupId() != null) {
+            try {
+                List<Integer> captainIndices = objectMapper.readValue(
+                        session.getCaptainIds(),
+                        new TypeReference<List<Integer>>() {});
+                if (captainIndices != null && captainIndices.contains(player.getGroupId())) {
+                    throw new RuntimeException("不能调整队长的池类型");
+                }
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException("解析队长信息失败", e);
+            }
+        }
+
+        if ("NORMAL".equals(targetPoolType)) {
+            playerMapper.updatePoolTypeAndFailedOrder(playerId, "NORMAL", null);
+        } else if ("FAILED".equals(targetPoolType)) {
+            Integer maxFo = playerMapper.selectMaxFailedOrderBySession(sessionId);
+            int next = (maxFo == null ? 1 : maxFo + 1);
+            playerMapper.updatePoolTypeAndFailedOrder(playerId, "FAILED", next);
+        } else {
+            throw new RuntimeException("无效的池类型");
+        }
     }
 
     @Override

@@ -21,4 +21,10 @@ public interface PlayerMapper {
     int updateCurrentAuctionId(Long id, Long auctionId);
     int updateTeamId(Long id, Long teamId);
     int deleteBySessionId(Long sessionId);
+
+    int countPoolNormalBySession(@Param("sessionId") Long sessionId);
+
+    Integer selectMaxFailedOrderBySession(@Param("sessionId") Long sessionId);
+
+    int updatePoolTypeAndFailedOrder(@Param("id") Long id, @Param("poolType") String poolType, @Param("failedOrder") Integer failedOrder);
 }

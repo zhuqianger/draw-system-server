@@ -6,6 +6,9 @@ package org.example.drawsystemserver.dto;
 public class PlayerDTO {
     private Long id;
     private Integer groupId;
+    /** NORMAL / FAILED */
+    private String poolType;
+    private Integer failedOrder;
     private String groupName; // 群内名字
     private String gameId; // 游戏ID名字
     private String position; // 擅长的位置
@@ -42,6 +45,22 @@ public class PlayerDTO {
 
     public void setGroupId(Integer groupId) {
         this.groupId = groupId;
+    }
+
+    public String getPoolType() {
+        return poolType;
+    }
+
+    public void setPoolType(String poolType) {
+        this.poolType = poolType;
+    }
+
+    public Integer getFailedOrder() {
+        return failedOrder;
+    }
+
+    public void setFailedOrder(Integer failedOrder) {
+        this.failedOrder = failedOrder;
     }
 
     public String getGroupName() {

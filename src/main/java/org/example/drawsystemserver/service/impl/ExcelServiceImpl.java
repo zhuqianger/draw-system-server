@@ -114,6 +114,7 @@ public class ExcelServiceImpl implements ExcelService {
             }
             
             player.setStatus("POOL");
+            player.setPoolType("NORMAL");
             
             players.add(player);
         }
@@ -216,6 +217,7 @@ public class ExcelServiceImpl implements ExcelService {
                 }
                 
                 player.setStatus("POOL");
+                player.setPoolType("NORMAL");
                 
                 players.add(player);
             }

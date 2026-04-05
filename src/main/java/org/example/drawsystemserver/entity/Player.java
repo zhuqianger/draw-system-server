@@ -17,6 +17,10 @@ public class Player {
     private String rank; // 段位
     private BigDecimal cost; // 费用
     private String status; // POOL-待拍卖池, AUCTIONING-拍卖中, SOLD-已售出
+    /** NORMAL-普通池, FAILED-流拍池 */
+    private String poolType;
+    /** 流拍池内顺序，越小越靠前 */
+    private Integer failedOrder;
     private Long currentAuctionId; // 当前拍卖ID
     private Long teamId; // 所属队伍ID
     private LocalDateTime createTime;
@@ -103,6 +107,22 @@ public class Player {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getPoolType() {
+        return poolType;
+    }
+
+    public void setPoolType(String poolType) {
+        this.poolType = poolType;
+    }
+
+    public Integer getFailedOrder() {
+        return failedOrder;
+    }
+
+    public void setFailedOrder(Integer failedOrder) {
+        this.failedOrder = failedOrder;
     }
 
     public Long getCurrentAuctionId() {

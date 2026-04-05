@@ -103,13 +103,13 @@ public class AuctionServiceImpl implements AuctionService {
         BigDecimal baseCost = player.getCost() != null ? player.getCost() : new BigDecimal("3");
         boolean isFirstTier = baseCost.compareTo(new BigDecimal("3")) >= 0;
         
-        // 第一梯度：基础定价-0.5，第二梯度：基础定价-1
+        // 第一梯度（>=3费）：基础定价-1，第二梯度（<3费）：基础定价-1.5
         BigDecimal startingPrice = isFirstTier 
-            ? baseCost.subtract(new BigDecimal("0.5"))
-            : baseCost.subtract(new BigDecimal("1"));
+            ? baseCost.subtract(new BigDecimal("1"))
+            : baseCost.subtract(new BigDecimal("1.5"));
         
-        // 最高出价 = 基础定价 + 3
-        BigDecimal maxPrice = baseCost.add(new BigDecimal("3"));
+        // 最高出价 = 基础定价 + 2.5
+        BigDecimal maxPrice = baseCost.add(new BigDecimal("2.5"));
 
         Auction auction = new Auction();
         auction.setSessionId(sessionId);
@@ -182,16 +182,16 @@ public class AuctionServiceImpl implements AuctionService {
         BigDecimal baseCost = player.getCost() != null ? player.getCost() : new BigDecimal("3");
         boolean isFirstTier = baseCost.compareTo(new BigDecimal("3")) >= 0;
         
-        // 捡漏环节：第一梯度：基础定价-1，第二梯度：基础定价-1.5
+        // 捡漏环节：第一梯度（>=3费）：基础定价-1.5，第二梯度（<3费）：基础定价-2
         BigDecimal startingPrice = isFirstTier 
-            ? baseCost.subtract(new BigDecimal("1"))
-            : baseCost.subtract(new BigDecimal("1.5"));
+            ? baseCost.subtract(new BigDecimal("1.5"))
+            : baseCost.subtract(new BigDecimal("2"));
 
         LocalDateTime now = LocalDateTime.now();
-        // 捡漏环节20秒
+        // 捡漏环节30秒
         auction.setStartTime(now);
-        auction.setEndTime(now.plusSeconds(20));
-        auction.setDuration(20);
+        auction.setEndTime(now.plusSeconds(30));
+        auction.setDuration(30);
         auction.setStatus("PICKUP_PHASE");
         auction.setPhase("PICKUP_PHASE");
         auction.setStartingPrice(startingPrice);
@@ -241,7 +241,7 @@ public class AuctionServiceImpl implements AuctionService {
         
         // 检查是否已经过了5秒的等待期
         // 第一阶段：30秒，需要开始后至少5秒才能出价（剩余时间<=25秒）
-        // 捡漏阶段：20秒，需要开始后至少5秒才能出价（剩余时间<=15秒）
+        // 捡漏阶段：30秒，需要开始后至少5秒才能出价（剩余时间<=25秒）
         LocalDateTime now = LocalDateTime.now();
         long secondsSinceStart = java.time.Duration.between(auction.getStartTime(), now).getSeconds();
         int minWaitSeconds = 5; // 等待期5秒
@@ -321,9 +321,9 @@ public class AuctionServiceImpl implements AuctionService {
             throw new RuntimeException("出价不能低于起拍价（起拍价：" + auction.getStartingPrice().toPlainString() + "）");
         }
 
-        // 检查出价是否超过最高价（费用上限：基础定价 + 3）
+        // 检查出价是否超过最高价（费用上限：基础定价 + 2.5）
         if (auction.getMaxPrice() != null && amount.compareTo(auction.getMaxPrice()) > 0) {
-            throw new RuntimeException("出价不能超过最高价（最高价：" + auction.getMaxPrice().toPlainString() + "，基础定价 + 3）");
+            throw new RuntimeException("出价不能超过最高价（最高价：" + auction.getMaxPrice().toPlainString() + "，基础定价 + 2.5）");
         }
 
         // 检查加价幅度：每次加价最少0.5

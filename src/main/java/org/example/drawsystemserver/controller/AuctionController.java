@@ -330,8 +330,8 @@ public class AuctionController {
         try {
             AuctionPickRecord targetRecord = auctionPickRecordMapper.selectById(recordId);
             auctionService.rollbackToPickRecord(recordId);
-            // 回退会影响队伍信息、待拍卖池和当前拍卖，广播系统变更事件，让前端合并刷新
-            webSocketService.broadcastSystemChanged(targetRecord != null ? targetRecord.getSessionId() : null);
+            // 回退影响范围较大，推送回退完成事件并携带该流程快照
+            webSocketService.broadcastRollbackCompleted(targetRecord != null ? targetRecord.getSessionId() : null);
             return ResponseDTO.success("已根据选人纪录回退到对应时刻之前的状态");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());

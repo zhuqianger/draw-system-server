@@ -226,6 +226,30 @@ public class WebSocketServiceImpl implements WebSocketService {
         return dto;
     }
 
+    private PlayerDTO buildPoolPlayerDelta(Long playerId) {
+        if (playerId == null) {
+            return null;
+        }
+        Player player = playerMapper.selectById(playerId);
+        if (player == null) {
+            return null;
+        }
+        PlayerDTO dto = new PlayerDTO();
+        dto.setId(player.getId());
+        dto.setGroupId(player.getGroupId());
+        dto.setPoolType(player.getPoolType());
+        dto.setFailedOrder(player.getFailedOrder());
+        dto.setGroupName(player.getGroupName());
+        dto.setGameId(player.getGameId());
+        dto.setPosition(player.getPosition());
+        dto.setHeroes(player.getHeroes());
+        dto.setRank(player.getRank());
+        dto.setCost(player.getCost());
+        dto.setStatus(player.getStatus());
+        dto.setTeamId(player.getTeamId());
+        return dto;
+    }
+
     private Long resolveSessionIdByAuctionId(Long auctionId) {
         if (auctionId == null) {
             return null;
@@ -343,6 +367,63 @@ public class WebSocketServiceImpl implements WebSocketService {
             logger.info("广播队员分配事件: sessionId={}, playerId={}, teamId={}", sessionId, playerId, teamId);
         } catch (Exception e) {
             logger.error("广播队员分配失败: playerId={}, teamId={}, error={}", playerId, teamId, e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void broadcastTeamCostUpdated(Long teamId) {
+        try {
+            Team team = teamMapper.selectById(teamId);
+            Long sessionId = team != null ? team.getSessionId() : null;
+            Map<String, Object> data = new HashMap<>();
+            data.put("team", buildTeamDelta(teamId));
+            sendEvent("TEAM_COST_UPDATED", sessionId, null, null, null, teamId, false, data);
+            logger.info("广播队伍费用更新事件: sessionId={}, teamId={}", sessionId, teamId);
+        } catch (Exception e) {
+            logger.error("广播队伍费用更新失败: teamId={}, error={}", teamId, e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void broadcastPlayerPoolChanged(Long sessionId, Long playerId) {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("player", buildPoolPlayerDelta(playerId));
+            sendEvent("PLAYER_POOL_CHANGED", sessionId, null, null, playerId, null, false, data);
+            logger.info("广播队员池变更事件: sessionId={}, playerId={}", sessionId, playerId);
+        } catch (Exception e) {
+            logger.error("广播队员池变更失败: sessionId={}, playerId={}, error={}", sessionId, playerId, e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void broadcastPlayerRemovedFromTeam(Long teamId, Long playerId) {
+        try {
+            Team team = teamMapper.selectById(teamId);
+            Long sessionId = team != null ? team.getSessionId() : null;
+            Map<String, Object> data = new HashMap<>();
+            data.put("team", buildTeamDelta(teamId));
+            data.put("poolPlayer", buildPoolPlayerDelta(playerId));
+            Map<String, Object> pickRecordRemoved = new HashMap<>();
+            pickRecordRemoved.put("teamId", teamId);
+            pickRecordRemoved.put("playerId", playerId);
+            data.put("pickRecordRemoved", pickRecordRemoved);
+            sendEvent("PLAYER_REMOVED_FROM_TEAM", sessionId, null, null, playerId, teamId, false, data);
+            logger.info("广播队员移出队伍事件: sessionId={}, teamId={}, playerId={}", sessionId, teamId, playerId);
+        } catch (Exception e) {
+            logger.error("广播队员移出队伍失败: teamId={}, playerId={}, error={}", teamId, playerId, e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void broadcastRollbackCompleted(Long sessionId) {
+        try {
+            Map<String, Object> data = new HashMap<>();
+            data.put("systemStatus", systemService.getSystemStatusBySession(sessionId));
+            sendEvent("ROLLBACK_COMPLETED", sessionId, null, null, null, null, false, data);
+            logger.info("广播回退完成事件: sessionId={}", sessionId);
+        } catch (Exception e) {
+            logger.error("广播回退完成失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
         }
     }
 

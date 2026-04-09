@@ -14,6 +14,7 @@ public interface TeamMapper {
     Team selectByUserId(Long userId);
     Team selectBySessionIdAndCaptainId(@Param("sessionId") Long sessionId, @Param("captainId") Long captainId);
     Team selectBySessionIdAndUserId(@Param("sessionId") Long sessionId, @Param("userId") Long userId);
+    List<Team> selectByIds(@Param("ids") List<Long> ids);
     List<Team> selectBySessionId(Long sessionId);
     List<Team> selectAll();
     int insert(Team team);

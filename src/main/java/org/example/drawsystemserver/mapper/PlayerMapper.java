@@ -13,6 +13,8 @@ public interface PlayerMapper {
     List<Player> selectBySessionId(Long sessionId);
     List<Player> selectBySessionIdAndStatus(Long sessionId, String status);
     List<Player> selectByTeamId(Long teamId);
+    List<Player> selectByTeamIds(@Param("teamIds") List<Long> teamIds);
+    List<Player> selectByIds(@Param("ids") List<Long> ids);
     List<Player> selectByTeamIdExcludingCaptain(@Param("teamId") Long teamId, @Param("captainId") Long captainId);
     List<Player> selectAll();
     int insert(Player player);

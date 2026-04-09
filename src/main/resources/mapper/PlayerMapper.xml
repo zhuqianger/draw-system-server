@@ -41,6 +41,24 @@
         SELECT * FROM player WHERE teamId = #{teamId} ORDER BY id
     </select>
 
+    <select id="selectByTeamIds" resultMap="BaseResultMap">
+        SELECT * FROM player
+        WHERE teamId IN
+        <foreach collection="teamIds" item="teamId" open="(" separator="," close=")">
+            #{teamId}
+        </foreach>
+        ORDER BY teamId, id
+    </select>
+
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT * FROM player
+        WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+        ORDER BY id
+    </select>
+
     <select id="selectByTeamIdExcludingCaptain" resultMap="BaseResultMap">
         SELECT * FROM player WHERE teamId = #{teamId} AND id != #{captainId} ORDER BY id
     </select>

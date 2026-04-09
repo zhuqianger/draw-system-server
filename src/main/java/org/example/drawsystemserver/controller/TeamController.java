@@ -19,6 +19,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -71,9 +74,7 @@ public class TeamController {
     @GetMapping("/session/{sessionId}")
     public ResponseDTO<List<TeamDTO>> getTeamsBySession(@PathVariable Long sessionId) {
         List<Team> teams = teamService.getTeamsBySession(sessionId);
-        List<TeamDTO> dtos = teams.stream()
-                .map(this::convertToDTO)
-                .collect(Collectors.toList());
+        List<TeamDTO> dtos = convertToSessionDTOs(teams);
         return ResponseDTO.success(dtos);
     }
 
@@ -386,5 +387,61 @@ public class TeamController {
                 .collect(Collectors.toList()));
 
         return dto;
+    }
+
+    /**
+     * 拍卖页高频接口的轻量组装：
+     * - 批量查询队员，避免按队伍查询造成 N+1
+     * - players 仅返回页面展示所需字段（id/groupName/gameId）
+     */
+    private List<TeamDTO> convertToSessionDTOs(List<Team> teams) {
+        if (teams == null || teams.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Long> teamIds = teams.stream()
+                .map(Team::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        List<Player> allPlayers = teamIds.isEmpty()
+                ? Collections.emptyList()
+                : playerMapper.selectByTeamIds(teamIds);
+
+        Map<Long, List<Player>> playersByTeamId = allPlayers.stream()
+                .filter(p -> p.getTeamId() != null)
+                .collect(Collectors.groupingBy(Player::getTeamId));
+
+        List<TeamDTO> result = new ArrayList<>(teams.size());
+        for (Team team : teams) {
+            TeamDTO dto = new TeamDTO();
+            dto.setId(team.getId());
+            dto.setCaptainId(team.getCaptainId());
+            dto.setTeamName(team.getTeamName());
+            dto.setPlayerCount(team.getPlayerCount());
+            dto.setTotalCost(team.getTotalCost());
+            dto.setNowCost(team.getNowCost());
+            dto.setUserId(team.getUserId());
+
+            List<Player> teamPlayers = playersByTeamId.getOrDefault(team.getId(), Collections.emptyList());
+            Map<Long, Player> playerById = new HashMap<>();
+            for (Player player : teamPlayers) {
+                playerById.put(player.getId(), player);
+            }
+
+            Player captain = team.getCaptainId() == null ? null : playerById.get(team.getCaptainId());
+            dto.setCaptainName(captain != null ? captain.getGroupName() : team.getCaptainName());
+
+            dto.setPlayers(teamPlayers.stream().map(p -> {
+                var playerDTO = new org.example.drawsystemserver.dto.PlayerDTO();
+                playerDTO.setId(p.getId());
+                playerDTO.setGroupName(p.getGroupName());
+                playerDTO.setGameId(p.getGameId());
+                return playerDTO;
+            }).collect(Collectors.toList()));
+
+            result.add(dto);
+        }
+        return result;
     }
 }

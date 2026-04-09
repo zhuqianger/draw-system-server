@@ -23,7 +23,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RestController
@@ -137,7 +142,8 @@ public class AuctionController {
         if (auction == null) {
             return ResponseDTO.success(null);
         }
-        return ResponseDTO.success(convertToDTO(auction));
+        // 高频接口走轻量组装，避免携带 recentBids/bidCount 导致额外查询与大响应体
+        return ResponseDTO.success(convertToDTO(auction, false));
     }
 
     /**
@@ -214,11 +220,29 @@ public class AuctionController {
      * 获取拍卖的竞价列表
      */
     @GetMapping("/{auctionId}/bids")
-    public ResponseDTO<List<BidDTO>> getBids(@PathVariable Long auctionId) {
+    public ResponseDTO<List<BidDTO>> getBids(@PathVariable Long auctionId,
+                                             @RequestParam(defaultValue = "false") Boolean lite) {
         List<Bid> bids = bidMapper.selectByAuctionId(auctionId);
-        List<BidDTO> dtos = bids.stream()
-                .map(this::convertToBidDTO)
-                .collect(Collectors.toList());
+
+        List<BidDTO> dtos;
+        if (Boolean.TRUE.equals(lite)) {
+            Set<Long> teamIds = bids.stream()
+                    .map(Bid::getTeamId)
+                    .filter(id -> id != null)
+                    .collect(Collectors.toSet());
+            Map<Long, Team> teamMap = teamIds.isEmpty()
+                    ? Collections.emptyMap()
+                    : teamMapper.selectByIds(teamIds.stream().collect(Collectors.toList())).stream()
+                    .collect(Collectors.toMap(Team::getId, t -> t, (a, b) -> a, HashMap::new));
+
+            dtos = bids.stream()
+                    .map(bid -> convertToBidLiteDTO(bid, teamMap))
+                    .collect(Collectors.toList());
+        } else {
+            dtos = bids.stream()
+                    .map(this::convertToBidDTO)
+                    .collect(Collectors.toList());
+        }
         return ResponseDTO.success(dtos);
     }
 
@@ -228,6 +252,37 @@ public class AuctionController {
     @GetMapping("/picks")
     public ResponseDTO<List<AuctionPickRecordDTO>> getPickRecords(@RequestParam Long sessionId) {
         List<AuctionPickRecord> records = auctionService.getPickRecordsBySession(sessionId);
+
+        Set<Long> playerIds = new HashSet<>();
+        Set<Long> teamIds = new HashSet<>();
+        for (AuctionPickRecord record : records) {
+            if (record.getPlayerId() != null) {
+                playerIds.add(record.getPlayerId());
+            }
+            if (record.getTeamId() != null) {
+                teamIds.add(record.getTeamId());
+            }
+        }
+
+        Map<Long, Player> playerMap = playerIds.isEmpty()
+                ? Collections.emptyMap()
+                : playerMapper.selectByIds(playerIds.stream().collect(Collectors.toList())).stream()
+                .collect(Collectors.toMap(Player::getId, p -> p, (a, b) -> a, HashMap::new));
+
+        Map<Long, Team> teamMap = teamIds.isEmpty()
+                ? Collections.emptyMap()
+                : teamMapper.selectByIds(teamIds.stream().collect(Collectors.toList())).stream()
+                .collect(Collectors.toMap(Team::getId, t -> t, (a, b) -> a, HashMap::new));
+
+        Set<Long> captainIds = teamMap.values().stream()
+                .map(Team::getCaptainId)
+                .filter(id -> id != null)
+                .collect(Collectors.toSet());
+        Map<Long, Player> captainMap = captainIds.isEmpty()
+                ? Collections.emptyMap()
+                : playerMapper.selectByIds(captainIds.stream().collect(Collectors.toList())).stream()
+                .collect(Collectors.toMap(Player::getId, p -> p, (a, b) -> a, HashMap::new));
+
         List<AuctionPickRecordDTO> dtos = records.stream().map(record -> {
             AuctionPickRecordDTO dto = new AuctionPickRecordDTO();
             dto.setId(record.getId());
@@ -239,17 +294,17 @@ public class AuctionController {
             dto.setSequence(record.getSequence());
             dto.setCreateTime(record.getCreateTime());
 
-            Player player = playerMapper.selectById(record.getPlayerId());
+            Player player = playerMap.get(record.getPlayerId());
             if (player != null) {
                 dto.setPlayerGroupName(player.getGroupName());
                 dto.setPlayerGameId(player.getGameId());
             }
 
-            Team team = teamMapper.selectById(record.getTeamId());
+            Team team = teamMap.get(record.getTeamId());
             if (team != null) {
                 dto.setTeamName(team.getTeamName());
                 // 队长名称优先从 player 表的 groupName 取
-                Player captainPlayer = playerMapper.selectById(team.getCaptainId());
+                Player captainPlayer = captainMap.get(team.getCaptainId());
                 if (captainPlayer != null) {
                     dto.setCaptainName(captainPlayer.getGroupName());
                 } else {
@@ -284,6 +339,10 @@ public class AuctionController {
     }
 
     private AuctionDTO convertToDTO(Auction auction) {
+        return convertToDTO(auction, true);
+    }
+
+    private AuctionDTO convertToDTO(Auction auction, boolean includeBidSnapshot) {
         AuctionDTO dto = new AuctionDTO();
         dto.setId(auction.getId());
         dto.setPlayerId(auction.getPlayerId());
@@ -316,11 +375,13 @@ public class AuctionController {
             }
         }
 
-        List<Bid> recentBids = bidMapper.selectRecentByAuctionId(auction.getId(), 5);
-        dto.setRecentBids(recentBids.stream()
-                .map(this::convertToBidDTO)
-                .collect(Collectors.toList()));
-        dto.setBidCount(bidMapper.selectByAuctionId(auction.getId()).size());
+        if (includeBidSnapshot) {
+            List<Bid> recentBids = bidMapper.selectRecentByAuctionId(auction.getId(), 5);
+            dto.setRecentBids(recentBids.stream()
+                    .map(this::convertToBidDTO)
+                    .collect(Collectors.toList()));
+            dto.setBidCount(bidMapper.selectByAuctionId(auction.getId()).size());
+        }
 
         return dto;
     }
@@ -345,6 +406,22 @@ public class AuctionController {
             dto.setCaptainName(captain.getUsername());
         }
 
+        return dto;
+    }
+
+    private BidDTO convertToBidLiteDTO(Bid bid, Map<Long, Team> teamMap) {
+        BidDTO dto = new BidDTO();
+        dto.setId(bid.getId());
+        dto.setAuctionId(bid.getAuctionId());
+        dto.setTeamId(bid.getTeamId());
+        dto.setAmount(bid.getAmount());
+        dto.setBidTime(bid.getBidTime());
+        dto.setIsWinner(bid.getIsWinner());
+
+        Team team = teamMap.get(bid.getTeamId());
+        if (team != null) {
+            dto.setTeamName(team.getTeamName());
+        }
         return dto;
     }
 }

@@ -7,6 +7,8 @@ import java.util.List;
  */
 public class SystemStatusDTO {
     private AuctionDTO currentAuction; // 当前进行的拍卖
+    private List<BidDTO> currentBidHistory; // 当前拍卖的竞价历史（最新在前）
+    private List<AuctionPickRecordDTO> pickRecords; // 当前流程的选人纪录
     private List<PlayerDTO> poolPlayers; // 待拍卖池中的队员
     private List<TeamDTO> teams; // 所有队伍信息
     private List<PlayerDTO> soldPlayers; // 已售出的队员
@@ -20,6 +22,22 @@ public class SystemStatusDTO {
 
     public void setCurrentAuction(AuctionDTO currentAuction) {
         this.currentAuction = currentAuction;
+    }
+
+    public List<BidDTO> getCurrentBidHistory() {
+        return currentBidHistory;
+    }
+
+    public void setCurrentBidHistory(List<BidDTO> currentBidHistory) {
+        this.currentBidHistory = currentBidHistory;
+    }
+
+    public List<AuctionPickRecordDTO> getPickRecords() {
+        return pickRecords;
+    }
+
+    public void setPickRecords(List<AuctionPickRecordDTO> pickRecords) {
+        this.pickRecords = pickRecords;
     }
 
     public List<PlayerDTO> getPoolPlayers() {

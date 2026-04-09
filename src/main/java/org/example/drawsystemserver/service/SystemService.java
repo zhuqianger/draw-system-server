@@ -4,4 +4,5 @@ import org.example.drawsystemserver.dto.SystemStatusDTO;
 
 public interface SystemService {
     SystemStatusDTO getSystemStatus();
+    SystemStatusDTO getSystemStatusBySession(Long sessionId);
 }

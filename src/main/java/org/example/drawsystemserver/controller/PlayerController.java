@@ -157,7 +157,7 @@ public class PlayerController {
         }
         try {
             playerService.changePlayerPool(request.getSessionId(), request.getPlayerId(), request.getTargetPoolType());
-            webSocketService.broadcastSystemStatus();
+            webSocketService.broadcastSystemChanged(request.getSessionId());
             return ResponseDTO.success("已更新队员所属池");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());

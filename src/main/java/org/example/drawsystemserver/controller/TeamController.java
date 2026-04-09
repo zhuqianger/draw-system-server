@@ -280,7 +280,8 @@ public class TeamController {
 
         try {
             auctionService.updateTeamCost(request.getTeamId(), request.getNowCost());
-            webSocketService.broadcastSystemStatus();
+            Team team = teamService.getById(request.getTeamId());
+            webSocketService.broadcastSystemChanged(team != null ? team.getSessionId() : null);
             return ResponseDTO.success("队伍费用已更新");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());
@@ -302,7 +303,8 @@ public class TeamController {
 
         try {
             auctionService.removePlayerFromTeam(request.getTeamId(), request.getPlayerId());
-            webSocketService.broadcastSystemStatus();
+            Team team = teamService.getById(request.getTeamId());
+            webSocketService.broadcastSystemChanged(team != null ? team.getSessionId() : null);
             return ResponseDTO.success("队员已移出队伍并回到待拍卖池");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());

@@ -273,9 +273,10 @@ public class AuctionController {
         }
 
         try {
+            AuctionPickRecord targetRecord = auctionPickRecordMapper.selectById(recordId);
             auctionService.rollbackToPickRecord(recordId);
-            // 回退会影响队伍信息、待拍卖池和当前拍卖，直接广播系统状态，让前端整体刷新
-            webSocketService.broadcastSystemStatus();
+            // 回退会影响队伍信息、待拍卖池和当前拍卖，广播系统变更事件，让前端合并刷新
+            webSocketService.broadcastSystemChanged(targetRecord != null ? targetRecord.getSessionId() : null);
             return ResponseDTO.success("已根据选人纪录回退到对应时刻之前的状态");
         } catch (Exception e) {
             return ResponseDTO.error(e.getMessage());

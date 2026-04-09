@@ -8,4 +8,5 @@ public interface WebSocketService {
     void broadcastBidPlaced(Long auctionId, Long bidId);
     void broadcastAuctionFinished(Long auctionId);
     void broadcastPlayerAssigned(Long playerId, Long teamId);
+    void broadcastSystemChanged(Long sessionId);
 }

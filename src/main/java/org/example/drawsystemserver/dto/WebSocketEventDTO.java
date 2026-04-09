@@ -5,12 +5,10 @@ package org.example.drawsystemserver.dto;
  */
 public class WebSocketEventDTO {
     private String eventId;
+    private String actionId;
     private String eventType;
     private Long sessionId;
-    private Long auctionId;
-    private Long bidId;
-    private Long playerId;
-    private Long teamId;
+    private Long sessionVersion;
     private Long timestamp;
     private SystemStatusDTO systemStatus;
     private Object data;
@@ -24,6 +22,14 @@ public class WebSocketEventDTO {
 
     public void setEventId(String eventId) {
         this.eventId = eventId;
+    }
+
+    public String getActionId() {
+        return actionId;
+    }
+
+    public void setActionId(String actionId) {
+        this.actionId = actionId;
     }
 
     public String getEventType() {
@@ -42,36 +48,12 @@ public class WebSocketEventDTO {
         this.sessionId = sessionId;
     }
 
-    public Long getAuctionId() {
-        return auctionId;
+    public Long getSessionVersion() {
+        return sessionVersion;
     }
 
-    public void setAuctionId(Long auctionId) {
-        this.auctionId = auctionId;
-    }
-
-    public Long getBidId() {
-        return bidId;
-    }
-
-    public void setBidId(Long bidId) {
-        this.bidId = bidId;
-    }
-
-    public Long getPlayerId() {
-        return playerId;
-    }
-
-    public void setPlayerId(Long playerId) {
-        this.playerId = playerId;
-    }
-
-    public Long getTeamId() {
-        return teamId;
-    }
-
-    public void setTeamId(Long teamId) {
-        this.teamId = teamId;
+    public void setSessionVersion(Long sessionVersion) {
+        this.sessionVersion = sessionVersion;
     }
 
     public Long getTimestamp() {

@@ -25,11 +25,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.MessagingException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 @Service
@@ -58,6 +62,9 @@ public class WebSocketServiceImpl implements WebSocketService {
     @Autowired
     private AuctionPickRecordMapper auctionPickRecordMapper;
 
+    private final Map<Long, AtomicLong> sessionVersionMap = new ConcurrentHashMap<>();
+    private final AtomicLong globalVersion = new AtomicLong(0);
+
     /**
      * 安全发送消息，捕获异常并记录日志
      */
@@ -74,20 +81,14 @@ public class WebSocketServiceImpl implements WebSocketService {
 
     private void sendEvent(String eventType,
                            Long sessionId,
-                           Long auctionId,
-                           Long bidId,
-                           Long playerId,
-                           Long teamId,
                            boolean includeSnapshot,
                            Object data) {
         WebSocketEventDTO event = new WebSocketEventDTO();
         event.setEventId(java.util.UUID.randomUUID().toString());
+        event.setActionId(resolveActionIdFromCurrentRequest());
         event.setEventType(eventType);
         event.setSessionId(sessionId);
-        event.setAuctionId(auctionId);
-        event.setBidId(bidId);
-        event.setPlayerId(playerId);
-        event.setTeamId(teamId);
+        event.setSessionVersion(nextSessionVersion(sessionId));
         event.setTimestamp(System.currentTimeMillis());
         if (includeSnapshot) {
             event.setSystemStatus(systemService.getSystemStatusBySession(sessionId));
@@ -96,6 +97,31 @@ public class WebSocketServiceImpl implements WebSocketService {
             event.setData(data);
         }
         safeSend("/topic/event", ResponseDTO.success(event));
+    }
+
+    private String resolveActionIdFromCurrentRequest() {
+        try {
+            var attributes = RequestContextHolder.getRequestAttributes();
+            if (!(attributes instanceof ServletRequestAttributes)) {
+                return null;
+            }
+            String actionId = ((ServletRequestAttributes) attributes).getRequest().getHeader("X-Action-Id");
+            if (actionId == null || actionId.trim().isEmpty()) {
+                return null;
+            }
+            return actionId.trim();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private long nextSessionVersion(Long sessionId) {
+        if (sessionId == null) {
+            return globalVersion.incrementAndGet();
+        }
+        return sessionVersionMap
+                .computeIfAbsent(sessionId, id -> new AtomicLong(0))
+                .incrementAndGet();
     }
 
     private Map<String, Object> buildAuctionData(Long auctionId) {
@@ -128,6 +154,39 @@ public class WebSocketServiceImpl implements WebSocketService {
             auctionPatch.put("playerRank", player.getRank());
             auctionPatch.put("playerCost", player.getCost());
         }
+
+        Bid highestBid = bidMapper.selectHighestByAuctionId(auction.getId());
+        if (highestBid != null) {
+            auctionPatch.put("highestBidAmount", highestBid.getAmount());
+            auctionPatch.put("highestBidTeamId", highestBid.getTeamId());
+            Team team = teamMapper.selectById(highestBid.getTeamId());
+            if (team != null) {
+                auctionPatch.put("highestBidTeamName", team.getTeamName());
+            }
+        }
+        return auctionPatch;
+    }
+
+    /**
+     * BID_PLACED 仅发送竞价实时变化相关字段，避免重复发送球员静态信息。
+     */
+    private Map<String, Object> buildAuctionBidData(Long auctionId) {
+        if (auctionId == null) {
+            return Collections.emptyMap();
+        }
+        Auction auction = auctionMapper.selectById(auctionId);
+        if (auction == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> auctionPatch = new HashMap<>();
+        auctionPatch.put("id", auction.getId());
+        auctionPatch.put("status", auction.getStatus());
+        auctionPatch.put("phase", auction.getPhase());
+        auctionPatch.put("startTime", auction.getStartTime());
+        auctionPatch.put("endTime", auction.getEndTime());
+        auctionPatch.put("duration", auction.getDuration());
+        auctionPatch.put("startingPrice", auction.getStartingPrice());
+        auctionPatch.put("maxPrice", auction.getMaxPrice());
 
         Bid highestBid = bidMapper.selectHighestByAuctionId(auction.getId());
         if (highestBid != null) {
@@ -296,7 +355,7 @@ public class WebSocketServiceImpl implements WebSocketService {
         try {
             SystemStatusDTO status = systemService.getSystemStatusBySession(null);
             safeSend("/topic/system-status", ResponseDTO.success(status));
-            sendEvent("SYSTEM_STATUS", null, null, null, null, null, true, null);
+            sendEvent("SYSTEM_STATUS", null, true, null);
             logger.info("广播系统状态更新事件");
         } catch (Exception e) {
             logger.error("广播系统状态失败: {}", e.getMessage(), e);
@@ -312,7 +371,7 @@ public class WebSocketServiceImpl implements WebSocketService {
             Long sessionId = resolveSessionIdByAuctionId(auctionId);
             Map<String, Object> data = new HashMap<>();
             data.put("auction", buildAuctionData(auctionId));
-            sendEvent("AUCTION_STARTED", sessionId, auctionId, null, null, null, false, data);
+            sendEvent("AUCTION_STARTED", sessionId, false, data);
             logger.info("广播拍卖开始事件: sessionId={}, auctionId={}", sessionId, auctionId);
         } catch (Exception e) {
             logger.error("广播拍卖开始失败: auctionId={}, error={}", auctionId, e.getMessage(), e);
@@ -328,8 +387,8 @@ public class WebSocketServiceImpl implements WebSocketService {
             Long sessionId = resolveSessionIdByAuctionId(auctionId);
             Map<String, Object> data = new HashMap<>();
             data.put("bid", toBidLiteDTO(bidMapper.selectById(bidId)));
-            data.put("auction", buildAuctionData(auctionId));
-            sendEvent("BID_PLACED", sessionId, auctionId, bidId, null, null, false, data);
+            data.put("auction", buildAuctionBidData(auctionId));
+            sendEvent("BID_PLACED", sessionId, false, data);
             logger.info("广播竞价事件: sessionId={}, auctionId={}, bidId={}", sessionId, auctionId, bidId);
         } catch (Exception e) {
             logger.error("广播竞价失败: auctionId={}, bidId={}, error={}", auctionId, bidId, e.getMessage(), e);
@@ -345,7 +404,7 @@ public class WebSocketServiceImpl implements WebSocketService {
             Long sessionId = resolveSessionIdByAuctionId(auctionId);
             Map<String, Object> data = new HashMap<>();
             data.put("auction", buildAuctionData(auctionId));
-            sendEvent("AUCTION_FINISHED", sessionId, auctionId, null, null, null, false, data);
+            sendEvent("AUCTION_FINISHED", sessionId, false, data);
             logger.info("广播拍卖结束事件: sessionId={}, auctionId={}", sessionId, auctionId);
         } catch (Exception e) {
             logger.error("广播拍卖结束失败: auctionId={}, error={}", auctionId, e.getMessage(), e);
@@ -363,7 +422,7 @@ public class WebSocketServiceImpl implements WebSocketService {
             data.put("team", buildTeamDelta(teamId));
             data.put("poolRemovedPlayerId", playerId);
             data.put("pickRecord", buildLatestPickRecord(sessionId));
-            sendEvent("PLAYER_ASSIGNED", sessionId, null, null, playerId, teamId, false, data);
+            sendEvent("PLAYER_ASSIGNED", sessionId, false, data);
             logger.info("广播队员分配事件: sessionId={}, playerId={}, teamId={}", sessionId, playerId, teamId);
         } catch (Exception e) {
             logger.error("广播队员分配失败: playerId={}, teamId={}, error={}", playerId, teamId, e.getMessage(), e);
@@ -377,7 +436,7 @@ public class WebSocketServiceImpl implements WebSocketService {
             Long sessionId = team != null ? team.getSessionId() : null;
             Map<String, Object> data = new HashMap<>();
             data.put("team", buildTeamDelta(teamId));
-            sendEvent("TEAM_COST_UPDATED", sessionId, null, null, null, teamId, false, data);
+            sendEvent("TEAM_COST_UPDATED", sessionId, false, data);
             logger.info("广播队伍费用更新事件: sessionId={}, teamId={}", sessionId, teamId);
         } catch (Exception e) {
             logger.error("广播队伍费用更新失败: teamId={}, error={}", teamId, e.getMessage(), e);
@@ -389,7 +448,7 @@ public class WebSocketServiceImpl implements WebSocketService {
         try {
             Map<String, Object> data = new HashMap<>();
             data.put("player", buildPoolPlayerDelta(playerId));
-            sendEvent("PLAYER_POOL_CHANGED", sessionId, null, null, playerId, null, false, data);
+            sendEvent("PLAYER_POOL_CHANGED", sessionId, false, data);
             logger.info("广播队员池变更事件: sessionId={}, playerId={}", sessionId, playerId);
         } catch (Exception e) {
             logger.error("广播队员池变更失败: sessionId={}, playerId={}, error={}", sessionId, playerId, e.getMessage(), e);
@@ -408,7 +467,7 @@ public class WebSocketServiceImpl implements WebSocketService {
             pickRecordRemoved.put("teamId", teamId);
             pickRecordRemoved.put("playerId", playerId);
             data.put("pickRecordRemoved", pickRecordRemoved);
-            sendEvent("PLAYER_REMOVED_FROM_TEAM", sessionId, null, null, playerId, teamId, false, data);
+            sendEvent("PLAYER_REMOVED_FROM_TEAM", sessionId, false, data);
             logger.info("广播队员移出队伍事件: sessionId={}, teamId={}, playerId={}", sessionId, teamId, playerId);
         } catch (Exception e) {
             logger.error("广播队员移出队伍失败: teamId={}, playerId={}, error={}", teamId, playerId, e.getMessage(), e);
@@ -418,9 +477,7 @@ public class WebSocketServiceImpl implements WebSocketService {
     @Override
     public void broadcastRollbackCompleted(Long sessionId) {
         try {
-            Map<String, Object> data = new HashMap<>();
-            data.put("systemStatus", systemService.getSystemStatusBySession(sessionId));
-            sendEvent("ROLLBACK_COMPLETED", sessionId, null, null, null, null, false, data);
+            sendEvent("ROLLBACK_COMPLETED", sessionId, true, null);
             logger.info("广播回退完成事件: sessionId={}", sessionId);
         } catch (Exception e) {
             logger.error("广播回退完成失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
@@ -430,7 +487,7 @@ public class WebSocketServiceImpl implements WebSocketService {
     @Override
     public void broadcastSystemChanged(Long sessionId) {
         try {
-            sendEvent("SYSTEM_CHANGED", sessionId, null, null, null, null, false, null);
+            sendEvent("SYSTEM_CHANGED", sessionId, false, null);
             logger.info("广播系统变更事件: sessionId={}", sessionId);
         } catch (Exception e) {
             logger.error("广播系统变更事件失败: sessionId={}, error={}", sessionId, e.getMessage(), e);

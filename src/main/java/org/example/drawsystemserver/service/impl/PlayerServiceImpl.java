@@ -65,6 +65,13 @@ public class PlayerServiceImpl implements PlayerService {
         return poolPlayers;
     }
 
+    @Override
+    public int countDrawableNormalPoolBySession(Long sessionId) {
+        return (int) getPoolPlayersBySession(sessionId).stream()
+                .filter(PlayerServiceImpl::isNormalPool)
+                .count();
+    }
+
     private static boolean isNormalPool(Player p) {
         String t = p.getPoolType();
         return t == null || t.isEmpty() || "NORMAL".equals(t);

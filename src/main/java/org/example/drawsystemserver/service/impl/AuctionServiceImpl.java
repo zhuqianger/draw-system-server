@@ -15,6 +15,7 @@ import org.example.drawsystemserver.mapper.BidMapper;
 import org.example.drawsystemserver.mapper.PlayerMapper;
 import org.example.drawsystemserver.mapper.TeamMapper;
 import org.example.drawsystemserver.service.AuctionService;
+import org.example.drawsystemserver.service.PlayerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +44,9 @@ public class AuctionServiceImpl implements AuctionService {
 
     @Autowired
     private AuctionSessionMapper auctionSessionMapper;
+
+    @Autowired
+    private PlayerService playerService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -128,7 +132,8 @@ public class AuctionServiceImpl implements AuctionService {
         }
 
         if ("FAILED".equals(player.getPoolType())) {
-            int normalLeft = playerMapper.countPoolNormalBySession(sessionId);
+            // 须与待拍卖池列表一致：队长在库中仍为 POOL/NORMAL，但不参与摇号，不能计入「仍有普通池队员」
+            int normalLeft = playerService.countDrawableNormalPoolBySession(sessionId);
             if (normalLeft > 0) {
                 throw new RuntimeException("仍有普通池队员，请先拍完普通池后再抽取流拍池");
             }

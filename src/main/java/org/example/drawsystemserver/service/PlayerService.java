@@ -7,6 +7,11 @@ import java.util.List;
 public interface PlayerService {
     List<Player> getPoolPlayers();
     List<Player> getPoolPlayersBySession(Long sessionId);
+
+    /**
+     * 与 {@link #getPoolPlayersBySession(Long)} 一致：普通池中可参与摇号的人数（已排除队长，仅 NORMAL 池）
+     */
+    int countDrawableNormalPoolBySession(Long sessionId);
     Player getById(Long id);
     Player startAuction(Long playerId);
     Player assignToTeam(Long playerId, Long teamId);
